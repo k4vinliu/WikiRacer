@@ -111,8 +111,25 @@ export function PlayerPanel() {
           />
         )}
         {!racing && html !== null && (
-          // Frozen, per FRONTEND.md §7: on `finished` both panels stop.
-          <div className="absolute inset-0 bg-card-green/10" aria-hidden />
+          /* Frozen, per FRONTEND.md §7. This needs to be UNMISSABLE, not
+             tasteful: it is the frame an audience sees at the instant someone
+             wins, and a 10% tint (what this was) reads as "nothing happened"
+             from across a room. In the real app App.tsx routes `finished` to
+             <Results/> immediately, so this shows for one frame on a win — but
+             it is also the steady state during `arming` and `countdown`, when
+             the player must be visibly unable to start early. */
+          <div
+            className="absolute inset-0 grid place-items-center bg-card-green/55 backdrop-blur-[2px]"
+            aria-hidden
+          >
+            <span className="rounded-pill bg-card-green px-5 py-2 font-display text-xl text-text-on-dark shadow-card">
+              {game.phase === "finished"
+                ? "race over"
+                : game.phase === "countdown"
+                  ? (game.countdown ?? "") || "get ready"
+                  : "get ready"}
+            </span>
+          </div>
         )}
       </div>
 

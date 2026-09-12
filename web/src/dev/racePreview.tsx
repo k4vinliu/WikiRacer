@@ -12,12 +12,14 @@
  * Uses the network (startRace fetches the start article) and the MOCK agent
  * feed, since `?agent=real` is unset. Add ?agent=real once Lane C's server is up.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import Race from "../screens/Race";
+import { Abandoned } from "../screens/Abandoned";
+import { Results } from "../screens/Results";
 import { PAIRS } from "../lib/pairs";
-import { startRace, useGame } from "../state/gameStore";
+import { playerNavigated, startRace, useGame } from "../state/gameStore";
 import type { Difficulty } from "../agent/types";
 import "../styles/theme.css";
 
@@ -76,9 +78,80 @@ function Harness() {
     );
   }
 
-  // arming / countdown / racing / finished all render through the real screen;
-  // the header shows which phase we are in.
-  return <Race />;
+  // Route exactly as App.tsx does, or the Results screen is never exercised —
+  // which is how an earlier version of this harness left CP2's "Setup -> Race
+  // -> Results end to end" looking like someone else's problem. Setup is still
+  // skipped on purpose: this harness starts a race directly.
+  return (
+    <>
+      {game.phase === "abandoned" ? (
+        <Abandoned />
+      ) : game.phase === "finished" ? (
+        <Results />
+      ) : (
+        <Race />
+      )}
+      <DevBar />
+    </>
+  );
+}
+
+/**
+ * DEV ONLY. Forces a human win so the win path can actually be exercised.
+ *
+ * It exists because the mock agent finishes in ~6 seconds and `makeFeed` (Lane
+ * A's) ignores mockFeed's speed multiplier, so there is no way to slow the agent
+ * down from here without editing their file. Clicking a real chain of links to
+ * the target inside that window is not practical, and "win detection both
+ * directions" is a CP2 requirement that had only ever been exercised in the
+ * agent direction.
+ *
+ * This calls the SAME store action `ArticleFrame` calls — `playerNavigated` —
+ * so it drives the real referee, the real win check and the real freeze. It is
+ * not a mock of the win; it is the win, with the clicking skipped.
+ */
+function DevBar() {
+  const game = useGame();
+  const armed = game.phase === "racing";
+
+  const win = useCallback(() => {
+    if (!armed) return;
+    playerNavigated({
+      title: game.targetTitle,
+      anchorText: `${game.targetTitle} (simulated click)`,
+    });
+  }, [armed, game.targetTitle]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "w") win();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [win]);
+
+  return (
+    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
+      <div className="flex items-center gap-3 rounded-pill bg-accent-black/90 px-4 py-2 text-sm text-text-on-dark shadow-hero backdrop-blur">
+        <span className="text-text-on-dark-muted">dev · {game.phase}</span>
+        <button
+          type="button"
+          onClick={win}
+          disabled={!armed}
+          className="rounded-pill bg-text-on-dark px-4 py-1.5 font-medium text-accent-black disabled:opacity-40"
+        >
+          ⚡ Win as player (W)
+        </button>
+        {game.phase === "finished" && (
+          <span className="text-text-on-dark-muted">
+            winner: <strong className="text-text-on-dark">{game.winner}</strong>
+            {game.reason ? ` · ${game.reason}` : ""}
+            {game.marginMs != null ? ` · margin ${Math.round(game.marginMs)}ms` : ""}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(<Harness />);
