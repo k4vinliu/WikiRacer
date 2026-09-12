@@ -23,13 +23,7 @@ import PathTrail from "./PathTrail";
 import { describeLoadError, loadArticle } from "../lib/articleHtml";
 import { markStartPainted, playerNavigated, useGame } from "../state/gameStore";
 
-export interface PlayerPanelProps {
-  /** Reported up so the header badge can say "the target is on this page".
-   *  The agent has this for free via links.find_target. */
-  onTargetPresence?: (present: boolean) => void;
-}
-
-export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
+export function PlayerPanel() {
   const game = useGame();
   const [html, setHtml] = useState<string | null>(null);
   const [title, setTitle] = useState<string>(game.startTitle);
@@ -87,8 +81,19 @@ export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
           <span className="text-text-on-dark-muted">you · </span>
           {title}
         </h2>
-        <span className="shrink-0 text-sm text-text-on-dark-muted">
-          {loading ? "loading…" : `${stats.n} legal links`}
+        <span className="flex shrink-0 items-baseline gap-2 text-sm">
+          {/* The target indicator lives HERE, not in the header, because it is a
+              fact about the page the player is looking at. The agent gets the
+              same information free via links.find_target, so showing it
+              restores symmetry rather than granting an advantage. */}
+          {stats.targetHere && (
+            <span className="rounded-pill bg-error-on-dark/20 px-2.5 py-0.5 text-error-on-dark">
+              target is on this page ◦
+            </span>
+          )}
+          <span className="text-text-on-dark-muted">
+            {loading ? "loading…" : `${stats.n} legal links`}
+          </span>
         </span>
       </header>
 
@@ -102,10 +107,7 @@ export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
             targetTitle={game.targetTitle}
             interactive={racing}
             onMove={onMove}
-            onCandidates={(n, targetHere) => {
-              setStats({ n, targetHere });
-              onTargetPresence?.(targetHere);
-            }}
+            onCandidates={(n, targetHere) => setStats({ n, targetHere })}
           />
         )}
         {!racing && html !== null && (

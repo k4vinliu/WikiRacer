@@ -76,13 +76,23 @@ export function ArticleFrame({
   // Keep the live callbacks and candidate set in refs: the click listener is
   // attached once per document write, and must never close over a stale prop.
   const onMoveRef = useRef(onMove);
+  const onCandidatesRef = useRef(onCandidates);
   const candidatesRef = useRef<Map<string, Candidate>>(new Map());
   const interactiveRef = useRef(interactive);
 
+  // EVERY callback prop lives in a ref, and NONE of them are in the effect's
+  // dependency array. This is not a micro-optimisation, it is a correctness
+  // requirement, and getting it half-right is what broke the first build:
+  // `onCandidates` was left in the deps, callers pass an inline arrow, so each
+  // render produced a new identity -> effect re-ran -> doc.write() -> the
+  // callback fired -> setState -> re-render -> new identity -> forever. The
+  // document was rewritten continuously and the click listener was torn down as
+  // fast as it was attached, so clicking a link did nothing at all.
   useLayoutEffect(() => {
     onMoveRef.current = onMove;
+    onCandidatesRef.current = onCandidates;
     interactiveRef.current = interactive;
-  }, [onMove, interactive]);
+  }, [onMove, onCandidates, interactive]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -101,11 +111,16 @@ export function ArticleFrame({
         `<base target="_self">` +
         `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>` +
         `<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Inter:wght@400;500;600&display=swap">` +
-        // Inlined, not <link>ed: a stylesheet request inside a freshly written
-        // document makes hop 1 flash unstyled at exactly the moment the race
-        // starts.
+        `</head><body>${pinProtocol(html)}` +
+        // OUR STYLES GO LAST, AFTER THE CONTENT. This is not a style choice.
+        // The payload carries ~19 inline TemplateStyles <style> blocks INSIDE
+        // <body>; anything we put in <head> is parsed earlier and loses to them
+        // at equal specificity. That is what clipped the infobox at Wikipedia's
+        // own `width: 22em` despite our containment rule. Appending here puts us
+        // last in document order, so we win without an !important on every rule.
+        // Inlined rather than <link>ed so hop 1 never flashes unstyled.
         `<style>${articleCss}</style><style>${hideRule}</style>` +
-        `</head><body>${pinProtocol(html)}</body></html>`,
+        `</body></html>`,
     );
     doc.close();
 
@@ -126,7 +141,7 @@ export function ArticleFrame({
         }
       }
     }
-    onCandidates?.(candidates.size, targetPresent);
+    onCandidatesRef.current?.(candidates.size, targetPresent);
 
     const onClick = (e: MouseEvent) => {
       const el = e.target as Element | null;
@@ -165,7 +180,8 @@ export function ArticleFrame({
       doc.body.removeEventListener("auxclick", onAux);
       doc.body.removeEventListener("contextmenu", onMenu);
     };
-  }, [html, title, targetTitle, onCandidates]);
+    // Deps are DATA ONLY. See the ref block above.
+  }, [html, title, targetTitle]);
 
   return (
     <iframe
