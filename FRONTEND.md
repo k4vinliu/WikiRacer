@@ -931,12 +931,27 @@ python3.11 -m speedrun.cli --start "Snakes" --target "WWII"   # then: steel brow
 | R8 | Prewarm, sit on Setup 6 minutes, then Start | Race still starts; `ready` re-fires; session recreated (trap 4). *The "second demo of the evening" test.* |
 | R9 | Each difficulty tier once | Easy: agent doesn't take a visible one-hop win. Hard: Sonnet path produces a real `choose_link`, **not** `was_fallback` on every hop (§5.5). |
 
-Three grep gates — each catches a *class* of mistake:
+One grep gate, plus two assertions that replace grep gates I originally got wrong:
+
 ```bash
+# A leaked key path is genuinely grep-shaped. Run it before every demo.
 grep -rEn 'sk-ant|STEEL_API_KEY|VITE_ANTHROPIC' web/src/ web/dist/ && echo "FAIL: key path in frontend"
-grep -rn  'rest_v1/page/html'  web/src/        && echo "FAIL: wrong HTML flavor (§2.2)"
-grep -rn  'hatnote'            web/src/styles/ && echo "FAIL: hiding a legal move (§5.3)"
 ```
+
+⚠️ **Two grep gates in the first draft of this section were wrong, and Lane B hit both.**
+`grep 'rest_v1/page/html' web/src/` fires on the *comment in `links.ts` explaining never to
+use it*, and `grep 'hatnote' web/src/styles/` fires on the rule that *styles* hatnotes as
+editorial asides — styling is not hiding. Both cried wolf on correct code, which is how a
+gate gets ignored and then misses the real thing. They are replaced by assertions that
+target the actual mistake, and both already pass:
+
+| Was a grep for | Is now |
+|---|---|
+| `rest_v1/page/html` | `titleFromHref("./Renaissance") === null` in `links.test.ts`, and `test_rejects_rest_v1_relative_hrefs` in `test_links.py`. The defect is *accepting the `./Title` href form*, not mentioning the endpoint. |
+| `hatnote` in styles | `expect(EXCLUDE_SELECTOR).not.toContain("hatnote")` and `.not.toContain("infobox")` in `links.test.ts`. The defect is *excluding a legal move*, not styling one. |
+
+Both languages also assert the parity that makes any of this meaningful: the TS and Python
+extractors return identical title lists in identical order against the committed fixture.
 
 ---
 

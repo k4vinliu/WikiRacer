@@ -1,0 +1,199 @@
+/* The article well. Lane B. FRONTEND.md §5.2.
+ *
+ * This lives INSIDE a same-origin srcdoc iframe, which is why plain element
+ * selectors are safe here and would be catastrophic in the app document:
+ * Wikipedia's own content stylesheet carries unscoped `a { color:#0645ad }`
+ * plus ~169 other unscoped selectors, and we deliberately do not link it.
+ *
+ * We are not trying to look like Wikipedia. We are trying to make Wikipedia's
+ * markup look like it belongs in a warm editorial card, while keeping every
+ * link obviously a link — the player is SCANNING for a link, not reading prose.
+ *
+ * The hide list is NOT in this file. `ArticleFrame` generates it from
+ * `EXCLUDE_SELECTOR` in lib/links.ts so the CSS hides exactly what the
+ * extractor drops. Two mechanisms, one source of truth — v1 kept them separate
+ * and they drifted, leaking 157 clickable-but-illegal links on one page.
+ *
+ * Tokens are duplicated as literals here on purpose: this stylesheet is
+ * injected into a separate document that has no access to the app's @theme.
+ * If you change a value in theme.css, change it here too.
+ */
+
+:root {
+  --well: #faf6ef; /* --color-surface-well */
+  --ink: #232823; /* --color-text-on-light */
+  --ink-muted: #585e56; /* --color-text-on-light-muted */
+  --rule: #dad3c6; /* --color-divider */
+  --link: #33443a; /* --color-card-green  */
+  --link-visited: #445a4e; /* --color-card-green-soft */
+  --target: #934535; /* --color-error, reused as the one warm highlight */
+}
+
+html {
+  background: var(--well);
+  /* The player scrolls a lot. Keep it smooth but not animated — motion inside
+     a 16:9 panel on a projector reads as a glitch. */
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  padding: 28px 32px 64px;
+  background: var(--well);
+  color: var(--ink);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* 17.5px over a 672px column ≈ 78ch. Above the 45-75ch reading ideal on
+     purpose: scanning, not reading. FRONTEND.md §4.3. */
+  font-size: 17.5px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+/* ---------------------------------------------------------------- type ---- */
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-weight: 500;
+  line-height: 1.15;
+  margin: 1.6em 0 0.5em;
+}
+h1 { font-size: 2rem; }
+h2 { font-size: 1.5rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.2rem; }
+h4 { font-size: 1.05rem; }
+
+p { margin: 0 0 1em; }
+ul, ol { margin: 0 0 1em; padding-left: 1.5em; }
+li { margin: 0.2em 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2em 0; }
+small, .mw-editsection { font-size: 0.85em; }
+
+/* ---------------------------------------------------------------- links --- */
+
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  border-radius: 3px;
+}
+a:visited { color: var(--link-visited); }
+a:hover {
+  background: rgb(51 68 58 / 0.08);
+  text-decoration-thickness: 2px;
+}
+a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/* Illegal-but-visible links should never happen — the hide list drops them —
+   but if one slips through, make it inert-looking rather than a trap. */
+a[data-wr-illegal] {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+/* THE TARGET HIGHLIGHT. FRONTEND.md §4.3 / decision 4.
+   The agent gets this free via links.find_target, so highlighting it for the
+   human restores symmetry rather than granting an advantage. No saturated
+   accent — the design spec bans them — so this is the palette's one warm tone
+   plus weight and a ring, which reads from across a room. */
+a[data-wr-target] {
+  color: var(--target);
+  font-weight: 600;
+  text-decoration-thickness: 2px;
+  background: rgb(147 69 53 / 0.1);
+  box-shadow: 0 0 0 3px rgb(147 69 53 / 0.1);
+}
+a[data-wr-target]::after {
+  content: " ◦";
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------- tables & media --- */
+
+/* THE TWO RULES THAT STOP THE PANEL EXPLODING. This fixture has 41 tables and
+   48 images; a single wide infobox or a cladogram will otherwise force the
+   article column past its 896px and break the whole Race layout. */
+table,
+.infobox,
+.wikitable {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+.infobox {
+  float: none; /* Wikipedia floats it right at 22em; in a 50% panel that
+                  squeezes the prose column to nothing. */
+  width: 100%;
+  margin: 0 0 1.5em;
+  padding: 12px;
+  background: rgb(51 68 58 / 0.04);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+}
+.infobox-image img,
+.thumb img {
+  border-radius: 8px;
+}
+
+th, td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+th { font-weight: 600; }
+
+figure, .thumb {
+  margin: 0 0 1.5em;
+  max-width: 100%;
+}
+figcaption, .thumbcaption {
+  color: var(--ink-muted);
+  font-size: 0.85em;
+  padding-top: 0.4em;
+}
+
+/* Hatnotes are LEGAL MOVES and are kept (see lib/links.ts). Style them as the
+   editorial aside they are, do not hide them. */
+.hatnote {
+  color: var(--ink-muted);
+  font-style: italic;
+  margin: 0 0 1em;
+}
+
+.shortdescription { display: none; } /* duplicate of the panel header */
+
+pre, code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  background: rgb(51 68 58 / 0.06);
+  border-radius: 6px;
+}
+pre { padding: 12px; overflow-x: auto; }
+code { padding: 1px 4px; }
+
+blockquote {
+  margin: 0 0 1em;
+  padding-left: 1em;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-muted);
+}
+
+/* Wikipedia ships hundreds of hardcoded light-background fills and
+   transparent-PNG diagrams. We do not try to recolour them — the well is light
+   for exactly this reason (FRONTEND.md §2.4). */

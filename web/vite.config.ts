@@ -6,5 +6,12 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    // the committed fixtures live above web/ — Lane B's preview page reads one
+    fs: { allow: [".."] },
+  },
+  // article-preview.html is deliberately NOT a build input: Vite serves any
+  // root-level .html in dev, and bundling it would ship a 582 KB fixture to
+  // production. Lane B, dev-only.
 });
