@@ -1,74 +1,132 @@
 /**
- * CP0's artifact (FRONTEND.md §10): proves the toolchain, the fonts and the
- * frozen tokens all work together. Lane A replaces this with the real phase
- * switch (setup | arming | countdown | racing | finished) in task 10.
- *
- * Deliberately shows one of everything the design system has to get right:
- * the beige gradient page, a portrait card in card-green, lowercase Fraunces
- * left-aligned inside it (per the reference composition, §3.1), Inter muted
- * body copy, a grey pill and the single black CTA, and the digit slots that
- * work around Fraunces having no tabular figures (§3.3).
+ * Lane A phase switch. Race.tsx (Lane B) is not imported — until it exists we
+ * render a stand-in that still exercises the referee, TimerBar, and mockFeed.
  */
-export default function App() {
+import { useState } from "react";
+import { Pill } from "./components/Pill";
+import { TimerBar } from "./components/TimerBar";
+import { playerNavigated, useGame } from "./state/gameStore";
+import { Abandoned } from "./screens/Abandoned";
+import { Results } from "./screens/Results";
+import { Setup } from "./screens/Setup";
+
+function RaceStandIn() {
+  const game = useGame();
+  const [hop, setHop] = useState("");
+  const you = game.playerTrail.at(-1)?.title ?? game.startTitle;
+  const agent = game.agentTrail.at(-1)?.title ?? game.startTitle;
+
+  function jump() {
+    const title = hop.trim();
+    if (!title || game.phase !== "racing") return;
+    playerNavigated({ title, anchorText: title });
+    setHop("");
+  }
+
   return (
-    <main className="min-h-screen p-6 font-body">
-      <nav className="mx-auto flex max-w-5xl items-center justify-between px-2 py-2">
-        <span className="font-medium text-text-on-light">Wikirace</span>
-        <button
-          type="button"
-          className="rounded-pill bg-surface-grey px-4 py-2 text-sm font-medium text-text-on-light"
-        >
-          How it works
-        </button>
-      </nav>
-
-      <div className="mt-16 flex justify-center">
-        {/* Portrait hero card, content LEFT-aligned. The card is centred; its
-            contents are not — see §3.1. */}
-        <section className="on-dark flex w-[min(630px,92vw)] flex-col rounded-hero bg-card-green p-10 shadow-hero">
-          <h1 className="font-display text-6xl leading-[0.95] tracking-tight text-text-on-dark">
-            wikirace
-            <br />
-            the agent
-          </h1>
-
-          <p className="mt-6 max-w-md text-lg leading-snug text-text-on-dark-muted">
-            Race a web agent from one Wikipedia article to another. First to land
-            on the target wins.
+    <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <section className="flex min-h-0 flex-1 flex-col bg-surface-well p-6">
+        <p className="text-sm text-text-on-light-muted">
+          YOU · {you}
+        </p>
+        <p className="mt-2 text-text-on-light">
+          Article renderer is Lane B. Until it lands, jump by canonical title.
+          Type the target and go to win.
+        </p>
+        <div className="mt-6 flex flex-wrap items-end gap-3">
+          <label className="block text-left">
+            <span className="text-sm text-text-on-light-muted">Hop to</span>
+            <input
+              value={hop}
+              onChange={(e) => setHop(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") jump();
+              }}
+              disabled={game.phase !== "racing"}
+              className="mt-1 block rounded-pill bg-surface-grey px-4 py-2 text-text-on-light outline-none"
+            />
+          </label>
+          <Pill variant="black" size="sm" disabled={game.phase !== "racing"} onClick={jump}>
+            Jump
+          </Pill>
+        </div>
+        <ol className="mt-6 list-decimal pl-5 text-text-on-light">
+          {game.playerTrail.map((h, i) => (
+            <li key={`${h.title}-${i}`}>{h.title}</li>
+          ))}
+        </ol>
+      </section>
+      <section className="flex min-h-0 flex-1 flex-col bg-card-green p-6 text-text-on-dark on-dark">
+        <p className="text-sm text-text-on-dark-muted">
+          AGENT · {agent}
+          {game.liveUrl ? " · live" : " · mock"}
+        </p>
+        {game.liveUrl ? (
+          <iframe
+            title="Agent live view"
+            src={`${game.liveUrl}${game.liveUrl.includes("?") ? "&" : "?"}interactive=false`}
+            className="mt-3 aspect-video w-full rounded-card bg-accent-black"
+          />
+        ) : (
+          <div className="mt-3 flex aspect-video w-full items-center justify-center rounded-card bg-card-green-soft text-text-on-dark-muted">
+            Mock agent — no Steel session
+          </div>
+        )}
+        <ol className="mt-4 min-h-0 flex-1 space-y-1 overflow-auto text-sm">
+          {game.agentEvents.map((e) => (
+            <li key={e.seq}>
+              {e.t === "thinking" ? (
+                <span>◔ thinking · {e.article} · {e.n_candidates} links</span>
+              ) : null}
+              {e.t === "pick" ? (
+                <span>
+                  {e.from} ─▶ “{e.anchor_text}”{" "}
+                  <span className="text-text-on-dark-muted">{e.reason}</span>
+                </span>
+              ) : null}
+              {e.t === "arrive" ? <span>landed {e.article}</span> : null}
+              {e.t === "done" ? <span>done · {e.reason}</span> : null}
+              {e.t === "error" ? <span>{e.message}</span> : null}
+              {e.t === "ready" ? <span>ready</span> : null}
+            </li>
+          ))}
+        </ol>
+        {game.agentStatus === "gave_up" ? (
+          <p className="mt-3 text-text-on-dark-muted">
+            The agent gave up after {game.agentHops} hops. You can still win.
           </p>
-
-          {/* The timer, in its fixed-width slots. 0.64em per digit, 0.28em for
-              the colon — measured against the pinned-axis Fraunces file. */}
-          <div className="mt-12 font-display tabular-slots text-[92px] leading-none text-text-on-dark">
-            {[..."00:00"].map((c, i) => (
-              <span
-                key={i}
-                style={{
-                  display: "inline-block",
-                  width: c === ":" ? "0.28em" : "0.64em",
-                  textAlign: "center",
-                }}
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-auto pt-12">
-            <p className="text-sm text-text-on-dark-muted">Where to where?</p>
-            <button
-              type="button"
-              className="mt-3 rounded-pill bg-accent-black px-7 py-3.5 font-medium text-text-on-dark"
-            >
-              Start Race
-            </button>
-          </div>
-        </section>
-      </div>
-
-      <p className="mx-auto mt-10 max-w-5xl px-2 text-center text-sm text-text-on-light-muted">
-        CP0 scaffold — see <code>FRONTEND.md</code> §9 for your lane.
-      </p>
-    </main>
+        ) : null}
+      </section>
+    </div>
   );
+}
+
+function RaceShell() {
+  const game = useGame();
+  return (
+    <div className="flex min-h-screen flex-col">
+      <TimerBar game={game} />
+      {game.phase === "arming" ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="font-display text-4xl text-text-on-light">Arming…</p>
+        </div>
+      ) : null}
+      {game.phase === "countdown" ? (
+        <div className="flex flex-1 items-center justify-center">
+          <p className="font-display tabular-slots text-[min(150px,30vw)] text-text-on-light">
+            {game.countdown === 0 ? "GO" : game.countdown}
+          </p>
+        </div>
+      ) : null}
+      {game.phase === "racing" ? <RaceStandIn /> : null}
+    </div>
+  );
+}
+
+export default function App() {
+  const game = useGame();
+  if (game.phase === "abandoned") return <Abandoned />;
+  if (game.phase === "finished") return <Results />;
+  if (game.phase === "setup" || game.phase === "validating") return <Setup />;
+  return <RaceShell />;
 }

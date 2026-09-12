@@ -1,0 +1,14 @@
+---
+description: Lane C file conventions — Steel, race loop, SSE server, CLI
+globs: speedrun/{steel_client,race,server,events,console,cli,config}.py,docs/steel-json-shapes.md,README.md
+alwaysApply: false
+---
+
+# Lane C files
+
+Follow `.agents/skills/lane-c-agent/SKILL.md`.
+
+- Four Steel functions: start, navigate, content, stop. Both timeout flags. `timeout=` on every `subprocess.run`. Errors include stdout.
+- Emit `FRONTEND.md` §6.1 events. SSE replays the full log on connect. Bind `127.0.0.1`.
+- Do not hard-check `STEEL_API_KEY`. Never put `connect_url` on screen. Never recreate a session inside `POST /go`.
+- Do not create `display.py`. Delete the stdin-daemon human-finish thread.

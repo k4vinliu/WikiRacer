@@ -11,7 +11,7 @@ left panel of the same app. One shared clock. First to the target article wins.
 | **anything user-facing** (React, CSS, screens, the renderer, the game feel) | **`FRONTEND.md`** → then `PLAN.md` §2 for the shared types |
 | **the agent** (Steel, the LLM link picker, the race loop, the server) | `PLAN.md` §1–§2, then your §4.x package → then `FRONTEND.md` §6 for the event schema |
 | **link extraction / titles** (either language) | `PLAN.md` §4.A **and** `FRONTEND.md` §5 — the rule must match in both |
-| **who builds what** | `ASSIGNMENTS.md` |
+| **who builds what** | **`FRONTEND.md` §9** (Lanes A/B/C) — then the matching `.agents/skills/lane-*/SKILL.md`. `ASSIGNMENTS.md` is the old 1/2/3 split and is superseded for user-facing work. **Lane A is the shell, not `PLAN.md` §4.A.** |
 
 **`PLAN.md` is SUPERSEDED for everything user-facing.** It describes a terminal UI
 (`rich`) and says the human races on their own laptop, out of code scope. Both are dead.
