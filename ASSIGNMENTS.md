@@ -1,5 +1,21 @@
 # Three-Way Split — Who Builds What
 
+> # ⛔ SUPERSEDED FOR EVERYTHING USER-FACING — 2026-09-12
+>
+> **Read [`FRONTEND.md`](./FRONTEND.md) (Build Spec v3) before doing any user-facing work,**
+> and [`CLAUDE.md`](./CLAUDE.md) before doing any work at all.
+>
+> The human now races **inside a web app we build**. Four of §1's locked decisions are
+> withdrawn: the human being out of code scope, the manually-called human finish, "no web
+> backend", and the 3-pane projector layout. **§4.D `display.py` is DELETED — do not write
+> it.** The UI is React, not `rich`.
+>
+> **Everything in §2 still stands and is still mandatory:** §2.1's five dataclasses are
+> unchanged, and §2.3's Steel traps, §2.4's Claude tool contract, §4.A's extraction blocker
+> and §4.C's `link_index` warning are all still correct. `FRONTEND.md` §8 has the exact
+> section-by-section delta.
+
+
 Companion to `PLAN.md`. Read `PLAN.md` Sections 1 and 2 in full, then your own lane below,
 then your assigned `4.x` package(s). This file only assigns work; the contracts and the
 specs live in `PLAN.md` and it wins any disagreement.
