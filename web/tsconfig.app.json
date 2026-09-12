@@ -22,5 +22,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests import node:fs for the parity fixture and are typechecked by
+  // tsconfig.vitest.json instead. Keeping them out keeps `npm run build`
+  // browser-pure. Lane B.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
