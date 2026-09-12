@@ -1,0 +1,10 @@
+# FROZEN in step 0a. Three people appending deps to one file is the most likely
+# merge conflict on this project, and it is entirely avoidable. Need something new?
+# Say so in chat and let one person add it.
+anthropic>=1,<2
+beautifulsoup4>=4.12
+rich>=13.7
+python-dotenv>=1.0
+
+# dev
+pytest
