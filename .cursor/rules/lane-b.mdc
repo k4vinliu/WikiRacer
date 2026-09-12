@@ -1,0 +1,15 @@
+---
+description: Lane B file conventions — extractor, renderer, picker, Race screen
+globs: web/src/lib/{links,articleHtml}.ts,web/src/components/{ArticleFrame,PlayerPanel,AgentPanel,AgentLog,PathTrail,TargetBadge}.tsx,web/src/styles/article.css,web/src/screens/Race.tsx,speedrun/{links,wiki,picker}.py,tests/test_{links,picker}.py
+alwaysApply: false
+---
+
+# Lane B files
+
+Follow `.agents/skills/lane-b-wikipedia/SKILL.md`.
+
+- One extraction rule in TS and Python. Keep `.infobox` and `.hatnote`. Add `.noprint` in Python.
+- Gate clicks with `candidates.has(title)`. `preventDefault` on every anchor.
+- Article HTML from `action=parse&prop=text` only. Never `rest_v1/page/html`.
+- Render `Candidate.index` verbatim. Never `enumerate(candidates, 1)`.
+- Do not edit `gameStore` or `TimerBar`. Do not create `display.py` or `test_wiki.py`.
