@@ -1,0 +1,122 @@
+/* FRONTEND.md §3.5 — Tailwind v4. The @theme token block is FROZEN.
+ *
+ * Changing a token here is a cross-lane decision: post it in chat and amend
+ * FRONTEND.md §3.2. Six of these values are deliberate edits to the original
+ * design spec, each because a WCAG contrast ratio failed — the reasons and the
+ * computed ratios are in FRONTEND.md §3.2. Do not "restore" them.
+ *
+ * Tailwind v4 is a Vite plugin. There is no tailwind.config.js. */
+
+@import "tailwindcss";
+
+@theme {
+  /* --- page ------------------------------------------------------------- */
+  --color-bg-page: #f3ebe0;
+  --color-bg-page-alt: #efe0d2;
+
+  /* --- card surfaces ---------------------------------------------------- */
+  --color-card-green: #33443a;
+  --color-card-green-soft: #445a4e; /* vs card-green is only 1.39:1 — a hover
+                                     * built on this swap alone is invisible.
+                                     * Pair it with a shadow or a divider. */
+
+  /* --- controls --------------------------------------------------------- */
+  --color-surface-grey: #e7e4dd; /* 1.07:1 on bg-page. NEVER place a bare grey
+                                  * pill directly on the beige page — it must
+                                  * sit inside a card-green card. §3.2 change 3 */
+  --color-surface-grey-dark: #d8d4ca;
+
+  /* --- the article reading well (§3.2 change 4) -------------------------- */
+  --color-surface-well: #faf6ef;
+
+  /* --- ink -------------------------------------------------------------- */
+  --color-text-on-dark: #f3f1ea;
+  --color-text-on-dark-muted: #c5cbc3; /* §3.2 change 2: #A7B0A5 was 3.33:1 on
+                                        * card-green-soft (fails AA) */
+  --color-text-on-light: #232823;
+  --color-text-on-light-muted: #585e56; /* §3.2 change 1: #6E756C failed AA on
+                                         * ALL FOUR light surfaces */
+  --color-text-on-light-subtle: #6e756c; /* legal at >=18.66px ONLY */
+
+  --color-accent-black: #171717; /* reserved for the ONE primary action of the
+                                  * current phase. The nav's right-hand pill is
+                                  * grey, permanently. §2.4 */
+  --color-divider: #dad3c6;
+
+  /* --- state (§3.2 changes 5 and 6) ------------------------------------- */
+  --color-focus-ring: #171717;
+  --color-focus-ring-on-dark: #f3f1ea;
+  --color-error: #934535;
+  --color-error-on-dark: #e0a292;
+
+  /* --- type ------------------------------------------------------------- */
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* --- shape ------------------------------------------------------------ */
+  --radius-hero: 32px; /* guessed — see §3.1. Single-variable revert. */
+  --radius-card: 24px;
+  --radius-pill: 999px;
+
+  --shadow-hero: 0 24px 64px -16px rgb(70 52 32 / 0.18),
+    0 2px 8px -2px rgb(70 52 32 / 0.1);
+  --shadow-card: 0 12px 32px -12px rgb(70 52 32 / 0.14);
+}
+
+:root {
+  --size-result: min(150px, 30vw); /* guessed — see §3.1 */
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(
+    168deg,
+    var(--color-bg-page) 0%,
+    var(--color-bg-page-alt) 100%
+  );
+  color: var(--color-text-on-light);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fraunces, with SOFT/WONK pinned to match the loaded file. */
+.font-display {
+  font-family: var(--font-display);
+  font-variation-settings: "SOFT" 50, "WONK" 0;
+}
+
+/* The giant timer / result number. Fraunces has NO tabular figures — `tnum` and
+ * font-variant-numeric are silent no-ops on it (§3.3), so TimerDigits must lay
+ * each character out in a fixed slot: 0.64em for digits, 0.28em for the colon. */
+.tabular-slots {
+  font-variation-settings: "opsz" 92, "SOFT" 50, "WONK" 0;
+  letter-spacing: 0;
+}
+
+/* The spec's "slight italic wonk" flavour text. Captions only, never the timer. */
+.font-display-wonk {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-variation-settings: "SOFT" 50, "WONK" 1;
+}
+
+/* The spec defines no focus ring, and borderless shadow-only pills are exactly
+ * where the default ring gets suppressed. Two tokens, because #171717 is 15.17:1
+ * on the page but only 1.73:1 on card-green. */
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+.on-dark :where(a, button, input, select, [tabindex]):focus-visible {
+  outline-color: var(--color-focus-ring-on-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
