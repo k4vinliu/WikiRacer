@@ -19,11 +19,13 @@ Offline. No network, no credentials.
 from __future__ import annotations
 
 import re
-from urllib.parse import unquote
-
 from bs4 import BeautifulSoup
 
 from speedrun.types import Candidate
+# ONE normalizer for the Python side. wiki.py owns it; this module had a second
+# copy and the two would have drifted. The cross-lane contract test in
+# web/src/lib/links.test.ts asserts it agrees with both TypeScript versions.
+from speedrun.wiki import normalize_title
 
 # --------------------------------------------------------------------------- #
 # The exclusion list. Keep in lockstep with EXCLUDE in web/src/lib/links.ts.
@@ -65,15 +67,6 @@ ARTICLE_HREF = re.compile(
 )
 _EXTERNAL = re.compile(r"^https?://", re.I)
 _OUR_HOST = re.compile(r"^https?://en\.wikipedia\.org/", re.I)
-
-
-def _ucfirst(s: str) -> str:
-    """Wikipedia titles are case-sensitive except for the first character."""
-    return s[0].upper() + s[1:] if s else s
-
-
-def normalize_title(raw: str) -> str:
-    return _ucfirst(unquote(str(raw)).replace("_", " ").strip())
 
 
 def title_from_href(href: str | None) -> str | None:

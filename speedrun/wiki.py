@@ -32,7 +32,16 @@ def _ucfirst(s: str) -> str:
 
 
 def normalize_title(raw: str) -> str:
-    return _ucfirst(unquote(str(raw)).replace("_", " ").strip())
+    """DISPLAY form: underscores to spaces, whitespace runs collapsed, trimmed,
+    first character upper-cased.
+
+    The whitespace collapse is not cosmetic — it is required for parity with
+    `normalizeTitle` in web/src/lib/links.ts and wikiApi.ts. Without it,
+    `"A  double  space"` and `"A double space"` compare unequal here and equal
+    in the browser, which is the asymmetry FRONTEND.md §2.6 warns about. The
+    cross-lane contract test in links.test.ts caught exactly that.
+    """
+    return _ucfirst(re.sub(r"\s+", " ", unquote(str(raw)).replace("_", " ")).strip())
 
 
 def canonical_title_from_html(html: str) -> str:

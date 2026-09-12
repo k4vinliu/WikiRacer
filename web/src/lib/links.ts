@@ -96,6 +96,12 @@ export interface Candidate {
 /** Wikipedia titles are case-sensitive except for the first character. */
 const ucfirst = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+/**
+ * DISPLAY normalization: underscores to spaces, whitespace runs collapsed,
+ * trimmed, first character upper-cased. Used for Map keys and for anything
+ * shown to a human. Preserves case after character one, because that is what
+ * Wikipedia does.
+ */
 export function normalizeTitle(raw: string): string {
   let t = raw;
   try {
@@ -103,12 +109,35 @@ export function normalizeTitle(raw: string): string {
   } catch {
     /* a stray % that isn't an escape — use the raw string */
   }
-  return ucfirst(t.replace(/_/g, " ").trim());
+  return ucfirst(t.replace(/_/g, " ").replace(/\s+/g, " ").trim());
 }
+
+/**
+ * COMPARISON key. Deliberately case-insensitive over the whole string, which
+ * is looser than Wikipedia's real rule (only character one is case-insensitive,
+ * so `AIDS` and `Aids` are genuinely different articles).
+ *
+ * Why looser on purpose: both win adjudicators are already permissive and
+ * already agree — Lane A's `titlesMatch` in wikiApi.ts decides the human's win,
+ * `wiki.titles_match` in Python decides the agent's. Being the one strict
+ * implementation would mean `findTarget` and the target highlight could
+ * disagree with the referee, i.e. a link that WILL win is not highlighted. And
+ * of the two failure modes, awarding a win beats denying one on a projector —
+ * denying a real win is exactly the v1 defect this project already fixed once.
+ *
+ * The residual risk is a false win between case-variant articles. It needs a
+ * curated pair whose target has a case-variant that is also linked on the page;
+ * none of the 20 pairs in FRONTEND.md §5.4 are anywhere near that.
+ *
+ * Still three implementations of one concept. The consolidation is one line in
+ * wikiApi.ts — `export { normalizeTitle, sameArticle as titlesMatch } from
+ * "./links";` — and links.test.ts asserts the three agree until someone does it.
+ */
+const compareKey = (raw: string) => normalizeTitle(raw).toLowerCase();
 
 /** The only title comparison in the app. Both racers' wins run through it. */
 export const sameArticle = (a: string, b: string) =>
-  normalizeTitle(a) === normalizeTitle(b);
+  compareKey(a) === compareKey(b);
 
 export const isWin = (current: string, target: string) =>
   sameArticle(current, target);
