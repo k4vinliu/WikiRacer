@@ -24,8 +24,14 @@
   --ink: #232823; /* --color-text-on-light */
   --ink-muted: #585e56; /* --color-text-on-light-muted */
   --rule: #dad3c6; /* --color-divider */
-  --link: #33443a; /* --color-card-green  */
-  --link-visited: #445a4e; /* --color-card-green-soft */
+  /* --color-link. NOT card-green: #33443a is hue 145 / sat 14% / light 23%
+     against body ink at hue 120 / sat 7% / light 15%, i.e. two dark desaturated
+     near-neutrals that are all but indistinguishable in running text. The whole
+     game is SCANNING FOR LINKS, so this is the one place the palette earns some
+     chroma. #26705a: 5.49:1 on the well (AA), 2.54:1 against body ink, and 146
+     degrees of hue from the target red so the two can never be confused. */
+  --link: #26705a;
+  --link-visited: #1f5a49;
   --target: #934535; /* --color-error, reused as the one warm highlight */
 }
 
@@ -74,17 +80,27 @@ small, .mw-editsection { font-size: 0.85em; }
 
 /* ---------------------------------------------------------------- links --- */
 
+/* Colour, not underline. A Wikipedia article is ~550 links; underlining them
+   all turns the page into a wall of rules and destroys the editorial feel.
+   Wikipedia itself does not underline. Underline on hover so the affordance is
+   still discoverable, and keep the weight bump for the target. */
 a {
   color: var(--link);
+  /* Colour AND a faint rule. Redundant encoding is the right call here: it is
+     more scannable at a glance and it does not fail for a colourblind player.
+     The underline is 1px at 40% so 550 of them read as texture, not as the wall
+     of solid rules that a full-strength underline produced. */
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+  text-underline-offset: 3px;
   border-radius: 3px;
 }
 a:visited { color: var(--link-visited); }
 a:hover {
-  background: rgb(51 68 58 / 0.08);
+  background: color-mix(in srgb, var(--link) 12%, transparent);
   text-decoration-thickness: 2px;
+  text-decoration-color: var(--link);
 }
 a:focus-visible {
   outline: 2px solid var(--link);
@@ -118,12 +134,11 @@ a[data-wr-target]::after {
 
 /* ------------------------------------------------------- tables & media --- */
 
-/* THE TWO RULES THAT STOP THE PANEL EXPLODING. This fixture has 41 tables and
-   48 images; a single wide infobox or a cladogram will otherwise force the
-   article column past its 896px and break the whole Race layout. */
-table,
-.infobox,
-.wikitable {
+/* This fixture has 41 tables and 48 images; without containment a single
+   cladogram forces the column past its 896px and breaks the Race layout.
+   Wide data tables scroll sideways inside the panel rather than forcing it
+   wider. `.infobox` is deliberately NOT in this list — see below. */
+table:not(.infobox) {
   display: block;
   max-width: 100%;
   overflow-x: auto;
@@ -135,19 +150,85 @@ img {
   height: auto;
 }
 
+/* THE INFOBOX. Three things had to change together after the first look at
+   this on screen:
+     - It must stay a TABLE. Forcing display:block made its cells lay out at
+       natural width inside a 22em box, which clipped every value
+       ("Temporal rang…", "Scientific classifi…", "Anima…").
+     - It must FLOAT. With float:none a tall taxonomy box pushed every paragraph
+       roughly 1000px down, so the panel opened with no prose on screen at all.
+       Wikipedia floats it right for exactly this reason.
+     - Its width must be ours, not Wikipedia's 22em, and its cells must wrap. */
 .infobox {
-  float: none; /* Wikipedia floats it right at 22em; in a 50% panel that
-                  squeezes the prose column to nothing. */
-  width: 100%;
-  margin: 0 0 1.5em;
-  padding: 12px;
+  display: table;
+  float: right;
+  clear: right;
+  width: 300px;
+  max-width: 42%;
+  margin: 0 0 1.25em 1.5em;
+  padding: 10px;
   background: rgb(51 68 58 / 0.04);
   border: 1px solid var(--rule);
   border-radius: 12px;
+  font-size: 0.85em;
+  table-layout: fixed;       /* cells wrap instead of forcing the table wider */
+  overflow-wrap: break-word;
 }
-.infobox-image img,
-.thumb img {
+.infobox td,
+.infobox th {
+  padding: 4px 6px;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.infobox img {
+  width: 100% !important;    /* beats Wikipedia's inline width attribute */
+  height: auto !important;
   border-radius: 8px;
+}
+.thumb img { border-radius: 8px; }
+
+/* Neutralise the infobox's own colours. Wikipedia's per-topic templates set
+   these as INLINE style attributes — the Greek language infobox title is
+   literally `style="font-size:125%; color: black; background-color: #c9ffd9;"`,
+   and that page carries 32 inline background declarations in total. An inline
+   attribute beats any stylesheet, so late injection does not help here and
+   !important is the only lever. Scoped to `.infobox` on purpose: Wikipedia uses
+   inline backgrounds MEANINGFULLY elsewhere (colour keys, legends, cladogram
+   swatches) and blanket-overriding them would destroy real information.
+   Infobox chrome is decorative, so it can go. */
+.infobox,
+.infobox *:not(a) {
+  background-color: transparent !important;
+  background-image: none !important;
+  color: var(--ink) !important;
+  font-size: inherit !important;
+}
+/* Then put OUR grouping back, from the palette. */
+.infobox {
+  background-color: rgb(51 68 58 / 0.04) !important;
+}
+.infobox .infobox-above,
+.infobox .infobox-title,
+.infobox .infobox-header,
+.infobox .infobox-subheader,
+.infobox caption {
+  background-color: rgb(51 68 58 / 0.07) !important;
+  font-weight: 600;
+  text-align: left;
+}
+.infobox .infobox-above,
+.infobox caption {
+  font-family: "Fraunces", ui-serif, Georgia, serif;
+  font-size: 1.05em !important;
+}
+
+/* A narrow panel cannot carry a floated thumbnail as well as a floated
+   infobox — inline the thumbs full width instead. */
+.thumb,
+figure[typeof~="mw:File/Thumb"] {
+  float: none !important;
+  width: auto !important;
+  max-width: 100%;
 }
 
 th, td {
@@ -197,3 +278,11 @@ blockquote {
 /* Wikipedia ships hundreds of hardcoded light-background fills and
    transparent-PNG diagrams. We do not try to recolour them — the well is light
    for exactly this reason (FRONTEND.md §2.4). */
+
+/* Containment, with !important only where Wikipedia uses inline attributes or
+   per-article TemplateStyles that our ordering alone cannot outrank. Keep this
+   list short and structural — never use it for typography. */
+body img,
+body video { max-width: 100% !important; height: auto; }
+body .mw-parser-output { max-width: 100%; }
+body table:not(.infobox) { width: auto !important; }

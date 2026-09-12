@@ -23,13 +23,7 @@ import PathTrail from "./PathTrail";
 import { describeLoadError, loadArticle } from "../lib/articleHtml";
 import { markStartPainted, playerNavigated, useGame } from "../state/gameStore";
 
-export interface PlayerPanelProps {
-  /** Reported up so the header badge can say "the target is on this page".
-   *  The agent has this for free via links.find_target. */
-  onTargetPresence?: (present: boolean) => void;
-}
-
-export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
+export function PlayerPanel() {
   const game = useGame();
   const [html, setHtml] = useState<string | null>(null);
   const [title, setTitle] = useState<string>(game.startTitle);
@@ -87,8 +81,19 @@ export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
           <span className="text-text-on-dark-muted">you · </span>
           {title}
         </h2>
-        <span className="shrink-0 text-sm text-text-on-dark-muted">
-          {loading ? "loading…" : `${stats.n} legal links`}
+        <span className="flex shrink-0 items-baseline gap-2 text-sm">
+          {/* The target indicator lives HERE, not in the header, because it is a
+              fact about the page the player is looking at. The agent gets the
+              same information free via links.find_target, so showing it
+              restores symmetry rather than granting an advantage. */}
+          {stats.targetHere && (
+            <span className="rounded-pill bg-error-on-dark/20 px-2.5 py-0.5 text-error-on-dark">
+              target is on this page ◦
+            </span>
+          )}
+          <span className="text-text-on-dark-muted">
+            {loading ? "loading…" : `${stats.n} legal links`}
+          </span>
         </span>
       </header>
 
@@ -102,15 +107,29 @@ export function PlayerPanel({ onTargetPresence }: PlayerPanelProps = {}) {
             targetTitle={game.targetTitle}
             interactive={racing}
             onMove={onMove}
-            onCandidates={(n, targetHere) => {
-              setStats({ n, targetHere });
-              onTargetPresence?.(targetHere);
-            }}
+            onCandidates={(n, targetHere) => setStats({ n, targetHere })}
           />
         )}
         {!racing && html !== null && (
-          // Frozen, per FRONTEND.md §7: on `finished` both panels stop.
-          <div className="absolute inset-0 bg-card-green/10" aria-hidden />
+          /* Frozen, per FRONTEND.md §7. This needs to be UNMISSABLE, not
+             tasteful: it is the frame an audience sees at the instant someone
+             wins, and a 10% tint (what this was) reads as "nothing happened"
+             from across a room. In the real app App.tsx routes `finished` to
+             <Results/> immediately, so this shows for one frame on a win — but
+             it is also the steady state during `arming` and `countdown`, when
+             the player must be visibly unable to start early. */
+          <div
+            className="absolute inset-0 grid place-items-center bg-card-green/55 backdrop-blur-[2px]"
+            aria-hidden
+          >
+            <span className="rounded-pill bg-card-green px-5 py-2 font-display text-xl text-text-on-dark shadow-card">
+              {game.phase === "finished"
+                ? "race over"
+                : game.phase === "countdown"
+                  ? (game.countdown ?? "") || "get ready"
+                  : "get ready"}
+            </span>
+          </div>
         )}
       </div>
 

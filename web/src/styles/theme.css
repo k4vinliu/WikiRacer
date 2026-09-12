@@ -38,6 +38,14 @@
                                          * ALL FOUR light surfaces */
   --color-text-on-light-subtle: #6e756c; /* legal at >=18.66px ONLY */
 
+  /* §3.2 change 7 (added by Lane B after seeing it on screen): links inside an
+     article need their own token. Mapping them to --color-card-green put a
+     hue-145/sat-14%/light-23% green against hue-120/sat-7%/light-15% body ink,
+     which is invisible in running text. 5.49:1 on the well, 2.54:1 vs the ink,
+     146 degrees of hue from --color-error so a link never reads as the target. */
+  --color-link: #26705a;
+  --color-link-visited: #1f5a49;
+
   --color-accent-black: #171717; /* reserved for the ONE primary action of the
                                   * current phase. The nav's right-hand pill is
                                   * grey, permanently. §2.4 */
