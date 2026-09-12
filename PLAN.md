@@ -1,5 +1,21 @@
 # Wikipedia Speedrun — Master Plan (Human vs. AI Bot Wiki Race)
 
+> # ⛔ SUPERSEDED FOR EVERYTHING USER-FACING — 2026-09-12
+>
+> **Read [`FRONTEND.md`](./FRONTEND.md) (Build Spec v3) before doing any user-facing work,**
+> and [`CLAUDE.md`](./CLAUDE.md) before doing any work at all.
+>
+> The human now races **inside a web app we build**. Four of §1's locked decisions are
+> withdrawn: the human being out of code scope, the manually-called human finish, "no web
+> backend", and the 3-pane projector layout. **§4.D `display.py` is DELETED — do not write
+> it.** The UI is React, not `rich`.
+>
+> **Everything in §2 still stands and is still mandatory:** §2.1's five dataclasses are
+> unchanged, and §2.3's Steel traps, §2.4's Claude tool contract, §4.A's extraction blocker
+> and §4.C's `link_index` warning are all still correct. `FRONTEND.md` §8 has the exact
+> section-by-section delta.
+
+
 **Status:** **Contracts v2 — amended 2026-09-12 after review.** Implementation not started.
 **Read this first:** Section 3 (the probe) is now a **hard gate that runs before any package starts**, not a parallel task. Section 2 was amended in six places; the amendment log is at the top of Section 2. If you read v1, re-read Section 2.
 **Purpose of this document:** This is written so any team member — or any AI coding agent working on their behalf — can pick up ONE section below and build it independently, without needing to read the other sections first, and without needing the rest of the codebase to exist yet. All cross-module dependencies are pinned down as explicit interfaces/contracts in Section 2. If you're an agent picking up a work package, read Section 1 (context) and Section 2 (contracts) in full, then only your assigned Section 4.x package.
