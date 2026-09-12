@@ -1,0 +1,16 @@
+---
+description: Lane A file conventions — chrome, Setup, Results, referee, wikiApi
+globs: web/src/App.tsx,web/src/components/{Pill,TopNav,TimerBar,TimerDigits,TitleInput,Card,InlineError,DifficultySegment}.tsx,web/src/lib/{wikiApi,pairs}.ts,web/src/state/{gameStore,useClock}.ts,web/src/screens/{Setup,Results}.tsx,web/src/agent/{mockFeed,sseFeed,index}.ts
+alwaysApply: false
+---
+
+# Lane A files
+
+Follow `.agents/skills/lane-a-shell/SKILL.md` and `reference.md`.
+
+- `wikiApi` is the only module that talks to wikipedia.org. `action=parse&prop=text`. Check `res.ok`. Normalize lookup keys with underscores.
+- Clock is `performance.now() - t0`. `rAF` paints; it does not measure. Stamp the player at click.
+- `Winner` is `"bot" | "human" | "none"`. No tie path. Photo-finish caption if margin < 1.0s.
+- `mockFeed` hops must be legal §5.3 moves. `anchor_text` is required.
+- Do not edit `theme.css` tokens or `agent/types.ts`.
+- Nav pill is grey. One black CTA at a time. Grey pills sit on `--card-green`, never on beige.

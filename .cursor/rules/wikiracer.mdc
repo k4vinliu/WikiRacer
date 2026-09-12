@@ -1,0 +1,16 @@
+---
+description: WikiRacer lane split, design authority, and hard-won rules
+alwaysApply: true
+---
+
+# WikiRacer
+
+Read `CLAUDE.md` then `AGENTS.md` before any edit.
+
+- **This branch is Lane A** (`lane-a-shell`). Skill: `.agents/skills/lane-a-shell/SKILL.md`.
+- **Lane A ≠ PLAN.md §4.A.** Package A (`links.py`) is Lane B. The current split is `FRONTEND.md` §9.
+- `FRONTEND.md` wins on anything visual. `PLAN.md` §2 wins on Python contracts.
+- Only touch files your lane owns. Import across lanes; do not edit across lanes.
+- Never create `speedrun/display.py`. Never fetch `rest_v1/page/html`. Never `pushState` the current article into the app URL.
+- Design authority is our tokens + Fraunces/Inter. Do not restyle against dialed.gg.
+- Use `python3.11`. Every `fetch` / `subprocess.run` needs error handling and a timeout.
