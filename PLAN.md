@@ -253,9 +253,19 @@ CHOOSE_LINK_TOOL = {
 }
 # tool_choice={"type": "tool", "name": "choose_link"} - always force the tool call, no freeform
 #   text turn. Valid on both models below (forced tool use only 400s on Fable/Mythos 5.1).
-# temperature=0 - REQUIRED. The default is 1.0, which would make 4.E's acceptance dry-run tell
-#   you nothing about what the stage run will do. Coupling: at 0, re-asking the same list returns
-#   the identical pick, so a stuck retry MUST drop the dead candidate (4.E step 4).
+# temperature - CORRECTED 2026-09-12 by Lane B, after this line broke on first contact.
+#   It is NOT a keyword argument: on the anthropic 1.x SDK (which is what our own
+#   `anthropic>=1,<2` pin resolves to, 1.5.0) `messages.create(temperature=...)` raises
+#   TypeError. It has to go through `extra_body={"temperature": 0}`, which is merged into
+#   the request JSON as-is.
+#   AND it is model-dependent: Haiku 4.5 accepts it, but **Claude Sonnet 5 rejects
+#   non-default sampling values** — and Sonnet 5 is exactly what FRONTEND.md §5.5's `hard`
+#   tier asks for. So the hard tier gets no determinism and is steered by prompt instead.
+#   See `model_params()` in speedrun/picker.py, which encodes both facts, and the three
+#   tests in tests/test_picker.py that pin them.
+#   Why we still want it on Haiku: the default is 1.0, which would make 4.E's acceptance
+#   dry-run tell you nothing about what the stage run will do. Coupling: at 0, re-asking the
+#   same list returns the identical pick, so a stuck retry MUST drop the dead candidate.
 # max_tokens=300 - fine on Haiku. See the Sonnet warning below.
 # default model: "claude-haiku-4-5"  <- the alias. Do NOT append a date suffix. (The dated id
 #   "claude-haiku-4-5-20251001" that v1 used is real and works, so this is hygiene, not a bug.)
