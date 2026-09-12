@@ -1,5 +1,9 @@
 /** The only module that may talk to wikipedia.org. FRONTEND.md §5.1. */
 
+import { normalizeTitle, sameArticle as titlesMatch } from "./links";
+
+export { normalizeTitle, titlesMatch };
+
 export class WikiError extends Error {
   status: number;
   constructor(status: number, message?: string) {
@@ -33,20 +37,6 @@ export const resolve = (t: string, m: Map<string, string>) => {
   const x = m.get(key(t)) ?? m.get(t) ?? t;
   return m.get(x) ?? x;
 };
-
-export function titlesMatch(a: string, b: string): boolean {
-  return normalizeTitle(a) === normalizeTitle(b);
-}
-
-export function normalizeTitle(t: string): string {
-  let s = t.trim();
-  try {
-    s = decodeURIComponent(s);
-  } catch {
-    /* already decoded */
-  }
-  return s.replace(/_/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
-}
 
 type ParseJson = {
   parse?: { title?: string; text?: string };
@@ -112,12 +102,11 @@ async function wikiFetch(url: string, attempt = 0): Promise<Response> {
 }
 
 export async function fetchArticle(title: string): Promise<Article> {
-  const cacheKey = normalizeTitle(title);
-  const hit = [...articleCache.values()].find((a) => normalizeTitle(a.title) === cacheKey);
+  const hit = [...articleCache.values()].find((a) => titlesMatch(a.title, title));
   if (hit) return hit;
 
   return withSlot(async () => {
-    const again = [...articleCache.values()].find((a) => normalizeTitle(a.title) === cacheKey);
+    const again = [...articleCache.values()].find((a) => titlesMatch(a.title, title));
     if (again) return again;
 
     const res = await wikiFetch(parseUrl(title));
