@@ -8,16 +8,28 @@ export type FeedHandle = AgentFeed & {
     target: string;
     difficulty: Difficulty;
     findTarget: boolean;
+    maxHops?: number;
   }) => Promise<void>;
   go: () => Promise<void>;
   stop: () => void;
 };
 
-type RaceStart = { id?: string; race_id?: string };
+type RaceStart = { id?: string; race_id?: string; error?: string };
+
+function errorMessage(status: number, path: string, text: string): string {
+  try {
+    const body = JSON.parse(text) as { error?: unknown };
+    if (typeof body.error === "string" && body.error.trim()) return body.error;
+  } catch {
+    /* not JSON */
+  }
+  return `Agent server ${status} on ${path}`;
+}
 
 export function sseFeed(base = AGENT_BASE): FeedHandle {
   let raceId: string | null = null;
   let source: EventSource | null = null;
+  let closed = false;
   const seen = new Set<number>();
 
   const post = async (path: string, body?: unknown) => {
@@ -30,10 +42,10 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
         body: body ? JSON.stringify(body) : undefined,
         signal: ctrl.signal,
       });
-      if (!res.ok) {
-        throw new Error(`Agent server ${res.status} on ${path}`);
-      }
       const text = await res.text();
+      if (!res.ok) {
+        throw new Error(errorMessage(res.status, path, text));
+      }
       if (!text) return {};
       try {
         return JSON.parse(text) as RaceStart;
@@ -46,12 +58,15 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
   };
 
   return {
-    async arm({ start, target, difficulty, findTarget }) {
+    async arm({ start, target, difficulty, findTarget, maxHops }) {
+      closed = false;
+      seen.clear();
       const created = await post("/race", {
         start,
         target,
         difficulty,
         find_target: findTarget,
+        ...(typeof maxHops === "number" ? { max_hops: maxHops } : {}),
       });
       raceId = created.id ?? created.race_id ?? "current";
     },
@@ -59,6 +74,11 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
     subscribe(on: (e: AgentEvent) => void) {
       const url = `${base}/events${raceId ? `?race=${encodeURIComponent(raceId)}` : ""}`;
       source = new EventSource(url);
+      let opened = false;
+      let announcedDisconnect = false;
+      source.onopen = () => {
+        opened = true;
+      };
       source.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data) as AgentEvent;
@@ -69,7 +89,11 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
           /* ignore a malformed frame */
         }
       };
+      // EventSource retries forever. Announce once, and only after we had a live
+      // stream — otherwise the first connecting blip becomes a false disconnect.
       source.onerror = () => {
+        if (closed || announcedDisconnect || !opened) return;
+        announcedDisconnect = true;
         on({
           seq: Number.MAX_SAFE_INTEGER,
           t: "error",
@@ -79,6 +103,7 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
         });
       };
       return () => {
+        closed = true;
         source?.close();
         source = null;
       };
@@ -90,6 +115,7 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
     },
 
     stop() {
+      closed = true;
       source?.close();
       source = null;
       void post("/stop").catch(() => undefined);
