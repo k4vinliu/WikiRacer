@@ -57,7 +57,7 @@ export function AgentPanel() {
             {STATUS[game.agentStatus] ?? game.agentStatus}
           </h2>
           <span className="shrink-0 text-base text-text-on-dark-muted">
-            {live ? "live" : "mock feed — no Steel session"}
+            {live ? "live" : real ? "no live view" : "mock feed"}
           </span>
         </header>
 
@@ -75,9 +75,9 @@ export function AgentPanel() {
           ) : (
             <div className="absolute inset-0 grid place-items-center p-6 text-center">
               <p className="max-w-sm text-base text-text-on-light-muted">
-                No live session. The agent is being driven by the mock feed, so
-                the race runs exactly the same — there is just no real browser
-                to watch.
+                {real
+                  ? "No browser to show — the agent is reading Wikipedia directly. It is still really racing: every hop below is a real link it chose."
+                  : "No live session. The agent is being driven by the mock feed, so the race runs exactly the same — there is just no real browser to watch."}
               </p>
             </div>
           )}
