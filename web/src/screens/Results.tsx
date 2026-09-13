@@ -5,12 +5,23 @@ import { TopNav } from "../components/TopNav";
 import { newArticles, raceAgain, useGame, type TrailHop } from "../state/gameStore";
 
 function headline(winner: string, reason: string | null): string {
+  // A WINNER OUTRANKS THE AGENT'S STOPPING REASON, and the order of these
+  // checks is the whole point.
+  //
+  // `hop_limit_reached` and `dead_end` say why the AGENT stopped. FRONTEND.md §7
+  // keeps the human racing after either, so "the agent gave up" and "the human
+  // won" are routinely both true -- and `tryAnnounce()` deliberately preserves
+  // the agent's reason in that case. Testing `reason` first therefore printed
+  // "The agent gave up" in 48px while the player who had just won looked for
+  // their own result. The give-up is not lost: the stats row below still reads
+  // "Agent - N hops - gave up".
+  if (winner === "human") return "You won!";
+  if (winner === "bot") return "Agent won!";
   if (reason === "error") return "Race ended early";
   if (reason === "hop_limit_reached") return "The agent gave up";
   if (reason === "dead_end") return "The agent hit a dead end";
+  // Kept as a backstop: a reason with no winner set should still read correctly.
   if (reason === "human_finished_first") return "You won!";
-  if (winner === "bot") return "Agent won!";
-  if (winner === "human") return "You won!";
   return "Race ended";
 }
 
