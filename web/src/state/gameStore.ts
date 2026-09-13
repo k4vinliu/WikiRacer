@@ -90,6 +90,26 @@ function emptySnapshot(over: Partial<GameSnapshot> = {}): GameSnapshot {
   };
 }
 
+function readMaxHops(): number {
+  try {
+    const raw = new URLSearchParams(location.search).get("max_hops");
+    const n = raw ? Number(raw) : NaN;
+    if (Number.isInteger(n) && n >= 1 && n <= 100) return n;
+  } catch {
+    /* jsdom / private mode */
+  }
+  return MAX_HOPS;
+}
+
+function runAborted(gen: number): boolean {
+  return (
+    gen !== startGen ||
+    state.phase === "finished" ||
+    state.phase === "setup" ||
+    state.phase === "abandoned"
+  );
+}
+
 function wasLive(): boolean {
   try {
     return sessionStorage.getItem(LIVE_KEY) === "1";
@@ -186,10 +206,17 @@ function tryAnnounce() {
 
   setLive(false);
   teardownFeed();
+  const kept = state.reason;
+  const reason: RaceReason =
+    kept === "hop_limit_reached" || kept === "dead_end"
+      ? kept
+      : winner === "human"
+        ? "human_finished_first"
+        : "won";
   patch({
     phase: "finished",
     winner,
-    reason: "won",
+    reason,
     elapsedMsAtFinish: at,
     agentStatus: winner === "bot" ? "won" : state.agentStatus,
   });
@@ -349,7 +376,7 @@ export async function startRace(input: {
     return;
   }
 
-  const pair =
+    const pair =
     findPair(start, target, input.difficulty) ?? {
       start,
       target,
@@ -357,6 +384,7 @@ export async function startRace(input: {
       atLeast: true as const,
       fanout: 0,
     };
+  const maxHops = readMaxHops();
 
   patch({
     phase: "arming",
@@ -368,12 +396,13 @@ export async function startRace(input: {
     startArticle: null,
     liveUrl: null,
     sessionId: null,
+    maxHops,
   });
   setLive(true);
 
   try {
     const articleP = fetchArticle(start).then((article) => {
-      if (gen !== startGen) return;
+      if (runAborted(gen)) return;
       painted = true;
       patch({ startArticle: article });
     });
@@ -384,14 +413,15 @@ export async function startRace(input: {
       target,
       difficulty: input.difficulty,
       findTarget: input.difficulty !== "easy",
+      maxHops,
     });
-    if (gen !== startGen) return;
+    if (runAborted(gen)) return;
     unsubFeed = feed.subscribe(onAgentEvent);
 
     const readyP = (async () => {
       const t0 = performance.now();
       while (!agentReady || !painted) {
-        if (gen !== startGen) return;
+        if (runAborted(gen)) return;
         if (performance.now() - t0 > ARM_MS) {
           throw new Error("Arming timed out. The agent didn't come ready in time.");
         }
@@ -400,14 +430,16 @@ export async function startRace(input: {
     })();
 
     await Promise.all([articleP, readyP]);
-    if (gen !== startGen) return;
+    if (runAborted(gen)) return;
 
     for (const n of [3, 2, 1]) {
       patch({ phase: "countdown", countdown: n });
       if (!(await sleep(1000, gen))) return;
+      if (runAborted(gen)) return;
     }
     patch({ countdown: 0 });
     if (!(await sleep(350, gen))) return;
+    if (runAborted(gen)) return;
 
     const t0 = performance.now();
     const startHop = { title: start, anchorText: "", at: 0 };
@@ -423,7 +455,7 @@ export async function startRace(input: {
     });
     await feed.go();
   } catch (err) {
-    if (gen !== startGen) return;
+    if (runAborted(gen)) return;
     failArm(err instanceof Error ? err.message : "Arming failed.");
   }
 }
