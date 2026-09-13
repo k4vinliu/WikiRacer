@@ -482,14 +482,27 @@ caption, a stats row (your time + hops vs the agent's), two plain `<ol>` paths, 
 **Six outcomes, not two.** The spec designs for "You won / Agent won"; `PLAN.md` §4.D's
 `announce_result` obligation requires all of them, each with `elapsed_s`:
 
-| `reason` | Headline | Note |
+⚠️ **A WINNER OUTRANKS THE AGENT'S STOPPING REASON. Test `winner` FIRST, then `reason`.**
+CORRECTED 2026-09-12 — this table used to be keyed on `reason` alone, and Lane A implemented
+it exactly as written, which was the right reading of the wrong spec. `hop_limit_reached` and
+`dead_end` say why the **agent** stopped; §7 keeps the human racing afterwards, so those two
+reasons can ONLY ever reach this screen alongside a human win. Keying the headline on `reason`
+therefore printed *"The agent gave up"* in 48px to a player who had just won, with the words
+"You won!" nowhere on screen. The agent's give-up is not lost — it belongs in the stats row
+("Agent · N hops · gave up"), not the headline. Pinned by `gameStore.referee.test.tsx`.
+
+| Condition, in this order | Headline | Note |
 |---|---|---|
-| `won` + `winner:"human"` | **You won!** | + "Photo finish — won by 0.4s" if margin < 1.0s |
-| `won` + `winner:"bot"` | **Agent won!** | |
-| `hop_limit_reached` | **The agent gave up** | *and the human's race keeps running* — see §7 |
-| `dead_end` | **The agent hit a dead end** | `NoCandidatesError` |
-| `human_finished_first` | **You won!** | (distinct from `won` only in provenance) |
-| `error` | **Race ended early** | host-readable message, never a stack trace |
+| `winner:"human"` | **You won!** | whatever `reason` holds — including a preserved `hop_limit_reached`/`dead_end` |
+| `winner:"bot"` | **Agent won!** | |
+| `reason: "error"` | **Race ended early** | host-readable message, never a stack trace |
+| `reason: "hop_limit_reached"` | **The agent gave up** | only with `winner:"none"`, i.e. nobody reached the target |
+| `reason: "dead_end"` | **The agent hit a dead end** | `NoCandidatesError`, same caveat |
+| `reason: "human_finished_first"` | **You won!** | backstop; `winner` above normally catches this first |
+
+The caption under the clock is **not** a photo-finish margin. `marginMs` is null in every
+stageable race — see §10 R5's amendment, which supersedes the "won by 0.4s" line this table
+used to advertise. `Results.tsx` keeps the `marginMs < 1000` branch as defensive code only.
 
 ---
 
