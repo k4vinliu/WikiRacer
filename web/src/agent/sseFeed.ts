@@ -31,6 +31,13 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
   let source: EventSource | null = null;
   let closed = false;
   const seen = new Set<number>();
+  // Locally-generated notices (not from the server) get their own seq space.
+  // It has to be UNIQUE per notice and can never collide with a real frame:
+  // `seq` is both gameStore's dedupe key (gameStore.ts:238) and AgentLog's React
+  // `key`. The old code hard-coded Number.MAX_SAFE_INTEGER, so the referee
+  // swallowed every notice after the first even if the feed re-sent one.
+  // Server seqs are positive and monotonic from 1, so negatives are always free.
+  let noticeSeq = -1;
 
   const post = async (path: string, body?: unknown) => {
     const ctrl = new AbortController();
@@ -78,6 +85,12 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
       let announcedDisconnect = false;
       source.onopen = () => {
         opened = true;
+        // Re-arm: the latch below is PER CONNECTION, not per race. Leaving it
+        // set after a recovered drop meant a later, permanent disconnect was
+        // announced to nobody -- the pane kept saying "browsing" over a dead
+        // agent, with a stale red row from the earlier blip sitting above newer
+        // hops. Reproduced with a TCP proxy: drop, recover, drop again.
+        announcedDisconnect = false;
       };
       source.onmessage = (ev) => {
         try {
@@ -89,13 +102,16 @@ export function sseFeed(base = AGENT_BASE): FeedHandle {
           /* ignore a malformed frame */
         }
       };
-      // EventSource retries forever. Announce once, and only after we had a live
-      // stream — otherwise the first connecting blip becomes a false disconnect.
+      // EventSource retries forever, and fires `error` on every failed attempt
+      // (measured: 3 in ~1s after one drop). So announce at most once PER
+      // CONNECTION — not once per race — and only after we had a live stream,
+      // otherwise the first connecting blip becomes a false disconnect. `onopen`
+      // clears the latch so the next drop is reported too.
       source.onerror = () => {
         if (closed || announcedDisconnect || !opened) return;
         announcedDisconnect = true;
         on({
-          seq: Number.MAX_SAFE_INTEGER,
+          seq: noticeSeq--,
           t: "error",
           at: 0,
           message: "Agent disconnected",
