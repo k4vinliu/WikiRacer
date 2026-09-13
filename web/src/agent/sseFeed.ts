@@ -1,6 +1,20 @@
 import type { AgentEvent, AgentFeed, Difficulty } from "./types";
 
-export const AGENT_BASE = "http://127.0.0.1:8848";
+/**
+ * Where the Python agent server lives.
+ *
+ * Hardcoding localhost was fine while the app only ever ran on the host's
+ * laptop, but a DEPLOYED build would then ask the visitor's own machine for an
+ * agent server. `VITE_AGENT_BASE` is read at BUILD time (Vite inlines it), and
+ * it is a URL, never a secret -- anything VITE_-prefixed ends up in the public
+ * bundle, which is why the API keys stay server-side.
+ *
+ * Unset, the default keeps the documented two-terminal local setup working
+ * exactly as before.
+ */
+export const AGENT_BASE = (
+  import.meta.env.VITE_AGENT_BASE || "http://127.0.0.1:8848"
+).replace(/\/+$/, "");
 
 export type FeedHandle = AgentFeed & {
   arm: (args: {
