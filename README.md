@@ -135,6 +135,39 @@ Every race except one stopped by the client ends with exactly one `done`. If a r
 stream drops (a reload, a closed tab), the server stops that race and releases its browser
 within about 6 seconds (`FRONTEND.md` §2.7; measured 6.4 s).
 
+## Deploying the app (Vercel)
+
+**What deploys is the frontend only, and it plays against the MOCK agent.** That is the
+stage fallback: the whole experience -- countdown, clicking, win detection, Results -- with a
+scripted opponent instead of a real browser. Good for a shareable link; not what judges
+should watch.
+
+**The Python server cannot go on Vercel**, and this is architectural, not a config you can
+fix. `speedrun/server.py` keeps the `RaceManager`, the `EventLog`, the Steel session and the
+`go` event in process memory, and `POST /race` -> `GET /events` -> `POST /race/<id>/go` are
+three separate requests that must share all of it. Serverless invocations are stateless and
+may land on different instances, so the sequence breaks. The agent also shells out to the
+`steel` NATIVE BINARY, whose credentials come from `steel login` writing a config file (we
+never read `STEEL_API_KEY` -- `PLAN.md` §4.E). A real agent needs a host with long-lived
+processes: Railway, Render, Fly.
+
+### Auto-deploy on push
+
+1. vercel.com/new -> import `kieran-ym/WikiRacer`.
+2. **Set Root Directory to `web`.** This is the one that bites: there is no `package.json` at
+   the repo root, so a default import fails the build. Everything else is already in
+   `web/vercel.json` (vite, `dist`, SPA rewrite).
+3. Deploy.
+
+After that, a push to `master` redeploys production and every PR gets its own preview URL.
+
+| Env var | When you need it |
+|---|---|
+| `VITE_AGENT_BASE` | Only if you host the Python server somewhere. Points the app at it; unset, it uses `http://127.0.0.1:8848` and the local two-terminal setup is unchanged. It is a URL, **never a secret** -- anything `VITE_`-prefixed is inlined into the public bundle, which is why the API keys stay server-side. |
+
+For a throwaway link with no account, `npm --prefix web exec vercel deploy --temporary`
+prints a URL that lives 60 minutes and a link to claim it.
+
 ## Where things are
 
 | | |
