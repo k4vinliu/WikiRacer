@@ -16,8 +16,18 @@ export type { FeedHandle };
  * but the race is entirely real: real Claude, real Wikipedia, real hops. The
  * agent pane must not caption that "mock feed". See AgentPanel.
  */
-export const isRealAgent = () =>
-  new URLSearchParams(location.search).get("agent") === "real";
+export const isRealAgent = () => {
+  const q = new URLSearchParams(location.search).get("agent");
+  // An explicit choice always wins, in both directions: `?agent=real` to try a
+  // hosted agent from a local build, `?agent=mock` to fall back on stage
+  // without redeploying (FRONTEND.md §9.3).
+  if (q === "real") return true;
+  if (q === "mock") return false;
+  // Otherwise: a build that was GIVEN a backend should use it. A visitor to the
+  // deployed site should not have to know to append a query param, and local dev
+  // sets no VITE_AGENT_BASE, so it still defaults to the mock there.
+  return Boolean(import.meta.env.VITE_AGENT_BASE);
+};
 
 export function makeFeed(pair: Pair): FeedHandle {
   return isRealAgent() ? sseFeed() : mockFeed(pair);

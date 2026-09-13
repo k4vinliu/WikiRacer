@@ -1,0 +1,19 @@
+# The frontend is Vercel's job. Keeping it out means a UI change never rebuilds
+# this image, and the server image carries no build tooling.
+web/
+tests/
+docs/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.git/
+.github/
+.pytest_cache/
+*.egg-info/
+.env
+.DS_Store
+# Markdown is for humans, not the runtime.
+*.md
+!requirements.txt
