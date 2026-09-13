@@ -50,20 +50,20 @@ export function AgentPanel() {
 
   return (
     <div className="flex min-h-0 w-full flex-col gap-4">
-      <section className="on-dark flex min-h-0 flex-col rounded-card bg-card-green p-4 shadow-card">
+      <section className="on-dark flex min-h-0 flex-col rounded-xl bg-card-green p-4 shadow-card">
         <header className="flex items-baseline justify-between gap-3 px-1 pb-3">
-          <h2 className="font-medium text-text-on-dark">
+          <h2 className="text-lg font-medium text-text-on-dark">
             <span className="text-text-on-dark-muted">agent&rsquo;s browser · </span>
             {STATUS[game.agentStatus] ?? game.agentStatus}
           </h2>
-          <span className="shrink-0 text-sm text-text-on-dark-muted">
-            {live ? "live" : real ? "no live view" : "mock feed"}
+          <span className="shrink-0 text-base text-text-on-dark-muted">
+            {live ? "live" : "mock feed — no Steel session"}
           </span>
         </header>
 
         {/* Exact 16:9, the only fixed-aspect element on the screen and the
             reason the right column is stacked rather than a third column. */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-[18px] bg-surface-well">
+        <div className="relative aspect-video w-full overflow-hidden rounded-md bg-surface-well">
           {live ? (
             <iframe
               src={live}
@@ -74,17 +74,17 @@ export function AgentPanel() {
             />
           ) : (
             <div className="absolute inset-0 grid place-items-center p-6 text-center">
-              <p className="max-w-sm text-text-on-light-muted">
-                {real
-                  ? "No browser to show — the agent is reading Wikipedia directly. It is still really racing: every hop below is a real link it chose."
-                  : "No live session. The agent is being driven by the mock feed, so the race runs exactly the same — there is just no real browser to watch."}
+              <p className="max-w-sm text-base text-text-on-light-muted">
+                No live session. The agent is being driven by the mock feed, so
+                the race runs exactly the same — there is just no real browser
+                to watch.
               </p>
             </div>
           )}
         </div>
       </section>
 
-      <section className="on-dark flex min-h-0 flex-1 flex-col rounded-card bg-card-green p-4 shadow-card">
+      <section className="on-dark flex min-h-0 flex-1 flex-col rounded-xl bg-card-green p-4 shadow-card">
         <div className="min-h-0 flex-1">
           <AgentLog
             events={game.agentEvents}

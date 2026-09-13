@@ -32,10 +32,10 @@ export function AgentLog({
 
   return (
     <div className="flex h-full flex-col">
-      <h3 className="px-1 pb-2 text-sm uppercase tracking-wider text-text-on-dark-muted">
+      <h3 className="px-1 pb-2 text-base uppercase tracking-wider text-text-on-dark-muted">
         agent reasoning
       </h3>
-      <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-1 text-sm">
+      <ol className="min-h-0 flex-1 space-y-2 overflow-y-auto px-1 text-base">
         {rows.map((e, i) => {
           if (e.t === "pick") {
             return (

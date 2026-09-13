@@ -20,7 +20,7 @@ No keys? The app still plays end to end against a scripted mock agent. That's th
 
 ```bash
 npm --prefix web install
-npm --prefix web run dev          # → http://localhost:5173
+npm run dev                       # from the repo root → http://127.0.0.1:5173
 ```
 
 ## Racing the real agent

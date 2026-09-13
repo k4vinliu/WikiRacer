@@ -17,7 +17,7 @@ export function PathTrail({
   const shown = trail.slice(-6);
   const hidden = trail.length - shown.length;
   return (
-    <div className="flex items-baseline gap-2 overflow-hidden text-sm">
+    <div className="flex items-baseline gap-2 overflow-hidden text-base">
       <span className="shrink-0 text-text-on-dark-muted">
         {label} · {hops} {hops === 1 ? "hop" : "hops"}
       </span>
