@@ -57,13 +57,19 @@ export function Results() {
       : null;
 
   return (
-    <div className="min-h-screen p-6 font-body">
+    // A COLUMN THAT OWNS THE VIEWPORT HEIGHT, so the card can be capped to it.
+    // The paths are unbounded -- a floundering human can rack up 9+ hops (seen
+    // on the first real race) -- and with no cap the card just grew until
+    // "Race again" sat below the fold. The host then cannot restart between
+    // demos without scrolling a projector. Headline, clock and actions are
+    // pinned; only the two path columns scroll.
+    <div className="flex h-screen flex-col p-6 font-body">
       <TopNav />
-      <div className="mt-16 flex justify-center">
+      <div className="mt-10 flex min-h-0 flex-1 justify-center">
         <Card
           tone="green"
           radius="hero"
-          className="flex w-[min(630px,92vw)] flex-col p-10"
+          className="flex max-h-full w-[min(630px,92vw)] flex-col p-10"
         >
           <h1 className="font-display text-6xl leading-[0.95] tracking-tight">{title}</h1>
           <div
@@ -76,7 +82,7 @@ export function Results() {
             {photo ??
               (game.reason === "error"
                 ? (game.agentMessage ?? "Something stopped the race.")
-                : "Seconds to finish")}
+                : "Time to finish")}
           </p>
 
           <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-text-on-dark-muted">
@@ -89,12 +95,12 @@ export function Results() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <div className="mt-6 grid min-h-0 flex-1 gap-6 overflow-y-auto sm:grid-cols-2">
             <Path label="Your path" hops={game.playerTrail} />
             <Path label="Agent path" hops={game.agentTrail} />
           </div>
 
-          <div className="mt-10 flex flex-wrap gap-3">
+          <div className="mt-8 flex shrink-0 flex-wrap gap-3">
             <Pill variant="black" onClick={raceAgain}>
               Race again
             </Pill>
