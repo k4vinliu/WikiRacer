@@ -8,6 +8,7 @@ function headline(winner: string, reason: string | null): string {
   if (reason === "error") return "Race ended early";
   if (reason === "hop_limit_reached") return "The agent gave up";
   if (reason === "dead_end") return "The agent hit a dead end";
+  if (reason === "human_finished_first") return "You won!";
   if (winner === "bot") return "Agent won!";
   if (winner === "human") return "You won!";
   return "Race ended";
