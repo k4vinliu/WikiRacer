@@ -48,10 +48,10 @@ body {
   background: var(--well);
   color: var(--ink);
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  /* 17.5px over a 672px column ≈ 78ch. Above the 45-75ch reading ideal on
-     purpose: scanning, not reading. FRONTEND.md §4.3. */
-  font-size: 17.5px;
-  line-height: 1.6;
+  /* 19px over a 672px column ≈ 72ch. Still a scan column, a bit larger so
+     links stay readable at a glance. FRONTEND.md §4.3. */
+  font-size: 19px;
+  line-height: 1.55;
   overflow-wrap: break-word;
 }
 
@@ -67,10 +67,10 @@ h4 {
   line-height: 1.15;
   margin: 1.6em 0 0.5em;
 }
-h1 { font-size: 2rem; }
-h2 { font-size: 1.5rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--rule); }
-h3 { font-size: 1.2rem; }
-h4 { font-size: 1.05rem; }
+h1 { font-size: 2.15rem; }
+h2 { font-size: 1.65rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--rule); }
+h3 { font-size: 1.3rem; }
+h4 { font-size: 1.1rem; }
 
 p { margin: 0 0 1em; }
 ul, ol { margin: 0 0 1em; padding-left: 1.5em; }

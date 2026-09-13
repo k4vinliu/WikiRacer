@@ -75,19 +75,19 @@ export function PlayerPanel() {
   const racing = game.phase === "racing";
 
   return (
-    <section className="on-dark flex min-h-0 w-full flex-col rounded-card bg-card-green p-4 shadow-card">
+    <section className="on-dark flex min-h-0 w-full flex-col rounded-xl bg-card-green p-4 shadow-card">
       <header className="flex items-baseline justify-between gap-3 px-1 pb-3">
-        <h2 className="min-w-0 truncate font-medium text-text-on-dark">
+        <h2 className="min-w-0 truncate text-lg font-medium text-text-on-dark">
           <span className="text-text-on-dark-muted">you · </span>
           {title}
         </h2>
-        <span className="flex shrink-0 items-baseline gap-2 text-sm">
+        <span className="flex shrink-0 items-baseline gap-2 text-base">
           {/* The target indicator lives HERE, not in the header, because it is a
               fact about the page the player is looking at. The agent gets the
               same information free via links.find_target, so showing it
               restores symmetry rather than granting an advantage. */}
           {stats.targetHere && (
-            <span className="rounded-pill bg-error-on-dark/20 px-2.5 py-0.5 text-error-on-dark">
+            <span className="rounded-md bg-error-on-dark/20 px-2.5 py-0.5 text-error-on-dark">
               target is on this page ◦
             </span>
           )}
@@ -97,7 +97,7 @@ export function PlayerPanel() {
         </span>
       </header>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-[18px] bg-surface-well">
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-md bg-surface-well">
         {html === null ? (
           <p className="p-6 text-text-on-light-muted">loading the start article…</p>
         ) : (
@@ -122,7 +122,7 @@ export function PlayerPanel() {
             className="absolute inset-0 grid place-items-center bg-card-green/55 backdrop-blur-[2px]"
             aria-hidden
           >
-            <span className="rounded-pill bg-card-green px-5 py-2 font-display text-xl text-text-on-dark shadow-card">
+            <span className="rounded-md bg-card-green px-5 py-2 font-display text-2xl text-text-on-dark shadow-card">
               {game.phase === "finished"
                 ? "race over"
                 : game.phase === "countdown"
@@ -134,7 +134,7 @@ export function PlayerPanel() {
       </div>
 
       {error && (
-        <p className="px-1 pt-2 text-sm text-error-on-dark" role="status">
+        <p className="px-1 pt-2 text-base text-error-on-dark" role="status">
           {error}
         </p>
       )}
