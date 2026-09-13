@@ -33,6 +33,20 @@
   --link: #26705a;
   --link-visited: #1f5a49;
   --target: #934535; /* --color-error, reused as the one warm highlight */
+
+  /* THE DENSITY KNOB. Change this one value to zoom the player's article in or
+     out; everything else here is sized in em and follows it.
+     The panel is 896px wide (Race.tsx) minus 16px card padding and 32px body
+     padding a side, so the text column is ~800px. At the original 17.5px that
+     was ~93 characters a line and only a screenful of lead paragraph -- the
+     player spent the race scrolling. 15px puts noticeably more of the article,
+     and so more candidate links, in front of them at once.
+     (The old comment here claimed "17.5px over a 672px column = 78ch". The
+     672px was from an earlier layout and had been wrong since the columns
+     settled at 896/flex.) */
+  --article-font-size: 15px;
+  /* Scaled with it: the infobox is the one fixed-width element on the page. */
+  --infobox-width: 260px;
 }
 
 html {
@@ -163,7 +177,7 @@ img {
   display: table;
   float: right;
   clear: right;
-  width: 300px;
+  width: var(--infobox-width);
   max-width: 42%;
   margin: 0 0 1.25em 1.5em;
   padding: 10px;

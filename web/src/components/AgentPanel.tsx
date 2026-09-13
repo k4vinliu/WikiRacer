@@ -16,6 +16,7 @@
  */
 import AgentLog from "./AgentLog";
 import PathTrail from "./PathTrail";
+import { isRealAgent } from "../agent";
 import { useGame } from "../state/gameStore";
 
 const readOnly = (url: string) => {
@@ -41,6 +42,11 @@ const STATUS: Record<string, string> = {
 export function AgentPanel() {
   const game = useGame();
   const live = game.liveUrl ? readOnly(game.liveUrl) : null;
+  // NO live view does not mean NO agent. `--page-source http` is the documented
+  // Steel-down lever, and in that mode the agent races for real with `live_url`
+  // empty. Captioning that "mock feed" tells a judge the demo is fake at the one
+  // moment it is not, so the two cases get different copy.
+  const real = isRealAgent();
 
   return (
     <div className="flex min-h-0 w-full flex-col gap-4">

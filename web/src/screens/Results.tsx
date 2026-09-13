@@ -5,12 +5,23 @@ import { TopNav } from "../components/TopNav";
 import { newArticles, raceAgain, useGame, type TrailHop } from "../state/gameStore";
 
 function headline(winner: string, reason: string | null): string {
+  // A WINNER OUTRANKS THE AGENT'S STOPPING REASON, and the order of these
+  // checks is the whole point.
+  //
+  // `hop_limit_reached` and `dead_end` say why the AGENT stopped. FRONTEND.md §7
+  // keeps the human racing after either, so "the agent gave up" and "the human
+  // won" are routinely both true -- and `tryAnnounce()` deliberately preserves
+  // the agent's reason in that case. Testing `reason` first therefore printed
+  // "The agent gave up" in 48px while the player who had just won looked for
+  // their own result. The give-up is not lost: the stats row below still reads
+  // "Agent - N hops - gave up".
+  if (winner === "human") return "You won!";
+  if (winner === "bot") return "Agent won!";
   if (reason === "error") return "Race ended early";
   if (reason === "hop_limit_reached") return "The agent gave up";
   if (reason === "dead_end") return "The agent hit a dead end";
+  // Kept as a backstop: a reason with no winner set should still read correctly.
   if (reason === "human_finished_first") return "You won!";
-  if (winner === "bot") return "Agent won!";
-  if (winner === "human") return "You won!";
   return "Race ended";
 }
 
@@ -46,13 +57,19 @@ export function Results() {
       : null;
 
   return (
-    <div className="min-h-screen p-6 font-body">
+    // A COLUMN THAT OWNS THE VIEWPORT HEIGHT, so the card can be capped to it.
+    // The paths are unbounded -- a floundering human can rack up 9+ hops (seen
+    // on the first real race) -- and with no cap the card just grew until
+    // "Race again" sat below the fold. The host then cannot restart between
+    // demos without scrolling a projector. Headline, clock and actions are
+    // pinned; only the two path columns scroll.
+    <div className="flex h-screen flex-col p-6 font-body">
       <TopNav />
-      <div className="mt-16 flex justify-center">
+      <div className="mt-10 flex min-h-0 flex-1 justify-center">
         <Card
           tone="green"
           radius="hero"
-          className="flex w-[min(630px,92vw)] flex-col p-10"
+          className="flex max-h-full w-[min(630px,92vw)] flex-col p-10"
         >
           <h1 className="font-display text-6xl leading-[0.95] tracking-tight">{title}</h1>
           <div
@@ -65,7 +82,7 @@ export function Results() {
             {photo ??
               (game.reason === "error"
                 ? (game.agentMessage ?? "Something stopped the race.")
-                : "Seconds to finish")}
+                : "Time to finish")}
           </p>
 
           <div className="mt-8 grid grid-cols-2 gap-4 text-sm text-text-on-dark-muted">
@@ -78,12 +95,12 @@ export function Results() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <div className="mt-6 grid min-h-0 flex-1 gap-6 overflow-y-auto sm:grid-cols-2">
             <Path label="Your path" hops={game.playerTrail} />
             <Path label="Agent path" hops={game.agentTrail} />
           </div>
 
-          <div className="mt-10 flex flex-wrap gap-3">
+          <div className="mt-8 flex shrink-0 flex-wrap gap-3">
             <Pill variant="black" onClick={raceAgain}>
               Race again
             </Pill>
