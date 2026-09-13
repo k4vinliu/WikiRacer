@@ -70,18 +70,51 @@ def summarize(result: RaceResult) -> str:
 
 def run_headless(agent: race.AgentRace, err: TextIO | None = None) -> tuple[RaceResult | None, bool]:
     """Run the race on its own thread so that Ctrl+C stops it cleanly: the thread that owns the
-    browser notices the stop flag and releases the session itself. Returns (result, interrupted)."""
+    browser notices the stop flag and releases the session itself. Returns (result, interrupted).
+
+    We wait on an Event, NOT on `thread.join()`, and that is load-bearing. A KeyboardInterrupt
+    delivered while the main thread is blocked inside `Thread.join(timeout)` lands in CPython's
+    bpo-45274 mitigation, which cannot tell "we acquired the lock then got interrupted" from
+    "we were still waiting for it": it sees the child's `_tstate_lock` held, releases it, and
+    calls `Thread._stop()`. The Thread object is now permanently marked dead even though the
+    thread is still running, so `is_alive()` returns False and EVERY later `join()` returns in
+    0.000s. Measured on CPython 3.11.15 with no project code involved.
+
+    That is precisely the Ctrl+C path, so the old `thread.join(60)` here returned instantly,
+    `main()` returned 130, and the interpreter tore down a daemon thread that had not reached
+    `AgentRace.run()`'s `finally` yet -- leaking the Steel cloud session the README promises to
+    release, and busting `steel browser sessions` must list nothing. An Event is not poisoned by
+    the interrupt, and the race thread sets it AFTER `run()` returns, hence after `source.close()`.
+    """
     err = err or sys.stderr
     box: dict[str, RaceResult] = {}
-    thread = threading.Thread(target=lambda: box.update(result=agent.run()), name="agent-race", daemon=True)
+    finished = threading.Event()
+
+    def target() -> None:
+        try:
+            box.update(result=agent.run())
+        finally:
+            # `run()` releases the browser in its own `finally`, so by the time this fires the
+            # session is already stopped. Do not move this above the call.
+            finished.set()
+
+    thread = threading.Thread(target=target, name="agent-race", daemon=True)
     thread.start()
     try:
-        while thread.is_alive():
-            thread.join(0.2)
+        while not finished.wait(0.2):
+            pass
     except KeyboardInterrupt:
         print("\nstopping Steel session...", file=err, flush=True)
         agent.stop.set()
-        thread.join(60)
+        try:
+            if not finished.wait(60):
+                print("the agent thread is still shutting down; run `steel browser sessions` and "
+                      "`steel browser stop <name>` if one is left over.", file=err, flush=True)
+        except KeyboardInterrupt:
+            # A second Ctrl+C is the host saying "I don't care, let me out". Honour it, but say
+            # plainly that we no longer know whether the browser was released.
+            print("interrupted again; the Steel session may still be open. Check "
+                  "`steel browser sessions`.", file=err, flush=True)
         return box.get("result"), True
     return box.get("result"), False
 
