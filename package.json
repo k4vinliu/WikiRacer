@@ -1,0 +1,12 @@
+{
+  "name": "wikiracer",
+  "private": true,
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "scripts": {
+    "dev": "npm --prefix web run dev -- --host 127.0.0.1 --port 5173 --strictPort",
+    "test": "npm --prefix web run test",
+    "typecheck": "npm --prefix web run typecheck"
+  }
+}

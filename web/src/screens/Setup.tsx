@@ -151,9 +151,17 @@ export function Setup() {
             />
           </div>
           <InlineError message={game.setupError} onDark />
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             <Pill variant="ghost" size="sm" onClick={onRandomize} disabled={busy}>
               Randomize
+            </Pill>
+            <Pill
+              variant="black"
+              size="sm"
+              disabled={!canStart}
+              onClick={() => void startRace({ start, target, difficulty })}
+            >
+              {busy ? "Checking…" : "Play"}
             </Pill>
           </div>
         </Card>
