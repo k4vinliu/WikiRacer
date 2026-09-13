@@ -17,8 +17,18 @@ export function TimerBar({ game }: { game: GameSnapshot }) {
   return (
     <header className="on-dark flex h-[112px] w-full items-center bg-card-green px-6 text-text-on-dark">
       <div className="flex min-w-0 flex-1 flex-col justify-center">
+        {/* The player's hop COUNT, with no denominator.
+            `maxHops` is the AGENT's server-enforced budget (speedrun/server.py
+            applies it to AgentRace only). Nothing caps the human -- there is no
+            maxHops check in playerNavigated or PlayerPanel -- so rendering
+            "HOP {playerHops}/{maxHops}" advertised a limit the player does not
+            have. At the default 25 that is merely misleading; with the
+            `?max_hops=N` param the header reads "RACING · HARD · HOP 4/3"
+            (rendered and confirmed), because §7 keeps the human clicking after
+            the agent's budget runs out. The agent's budget still surfaces where
+            it means something: the give-up line right below, and AgentPanel. */}
         <p className="text-sm tracking-wide text-text-on-dark-muted">
-          {phaseLabel} · {game.difficulty.toUpperCase()} · HOP {game.playerHops}/{game.maxHops}
+          {phaseLabel} · {game.difficulty.toUpperCase()} · HOP {game.playerHops}
         </p>
         {game.agentStatus === "gave_up" ? (
           <p className="text-sm text-text-on-dark-muted">
