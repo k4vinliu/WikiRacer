@@ -48,8 +48,11 @@ export function AgentPanel() {
   // moment it is not, so the two cases get different copy.
   const real = isRealAgent();
 
+  // min-w-0 here and on the column around it in Race.tsx: a flex item is never narrower than
+  // its content by default, and the route line at the foot of this panel never wraps, so a
+  // long route pushed the panel past the window edge. Pinned by AgentPanel.test.tsx.
   return (
-    <div className="flex min-h-0 w-full flex-col gap-4">
+    <div className="flex min-h-0 min-w-0 w-full flex-col gap-4">
       <section className="on-dark flex min-h-0 flex-col rounded-xl bg-card-green p-4 shadow-card">
         <header className="flex items-baseline justify-between gap-3 px-1 pb-3">
           <h2 className="text-lg font-medium text-text-on-dark">

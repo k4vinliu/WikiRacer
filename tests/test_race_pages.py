@@ -171,7 +171,7 @@ def test_steel_source_stamps_arrival_when_navigation_finishes(monkeypatch):
 
     monkeypatch.setattr(race.steel_client, "navigate", navigate)
     monkeypatch.setattr(race.steel_client, "content", content)
-    src = race.SteelSource(HANDLE, started_at=100.0, clock=clock)
+    src = race.SteelSource(HANDLE, clock=clock)
     assert src.goto("https://en.wikipedia.org/wiki/Cat") == ("<html>page</html>", 100.8)
     assert order == ["navigate", "content"]
 
@@ -181,10 +181,60 @@ def test_steel_source_will_not_command_a_session_past_its_lifetime(monkeypatch):
     monkeypatch.setattr(race.steel_client, "navigate",
                         lambda *a, **k: pytest.fail("sent a command to an expired session"))
     clock = Clock(0.0)
-    src = race.SteelSource(HANDLE, started_at=0.0, clock=clock)
+    src = race.SteelSource(HANDLE, started_at=0.0, wall_clock=clock)
     clock.t = 900.0
     with pytest.raises(steel_client.SteelSessionLost):
         src.goto("https://en.wikipedia.org/wiki/Cat")
+
+
+def test_the_lifetime_guard_counts_time_the_machine_spent_asleep(monkeypatch):
+    # Seen for real on 2026-09-12: the Mac slept through a session's whole 15-minute lifetime.
+    # time.monotonic() is mach_absolute_time() on macOS and stops during sleep; Steel's clock
+    # doesn't. So the guard has to measure session age in wall-clock time.
+    wall = Clock(1_000_000.0)
+    monkeypatch.setattr(race.time, "time", wall)
+    monkeypatch.setattr(race.steel_client, "navigate",
+                        lambda *a, **k: pytest.fail("sent a command to a session that expired while asleep"))
+    src = race.SteelSource(HANDLE)
+    wall.t += 900.0  # asleep: wall time moved, time.monotonic() did not
+    with pytest.raises(steel_client.SteelSessionLost):
+        src.goto("https://en.wikipedia.org/wiki/Cat")
+
+
+def test_an_error_on_a_session_steel_has_released_means_the_session_is_lost(monkeypatch):
+    # Retrying under a dead session's name makes Steel silently start a NEW, invisible browser
+    # (seen for real on 2026-09-12: session 4d04c4ad, created by the retry). So before anyone
+    # retries a failed command, ask Steel whether the session is still live.
+    def navigate(*a, **k):
+        raise steel_client.SteelError("`steel browser navigate` failed (exit 1): connection reset")
+
+    monkeypatch.setattr(race.steel_client, "navigate", navigate)
+    monkeypatch.setattr(race.steel_client, "session_info", lambda sid: {"id": sid, "status": "released"})
+    with pytest.raises(steel_client.SteelSessionLost):
+        race.SteelSource(HANDLE).goto("https://en.wikipedia.org/wiki/Cat")
+
+
+def test_an_error_on_a_live_session_is_passed_on_so_the_race_can_retry(monkeypatch):
+    def navigate(*a, **k):
+        raise steel_client.SteelTimeout("`steel browser navigate` did not answer within 20s")
+
+    monkeypatch.setattr(race.steel_client, "navigate", navigate)
+    monkeypatch.setattr(race.steel_client, "session_info", lambda sid: {"id": sid, "status": "live"})
+    with pytest.raises(steel_client.SteelTimeout):
+        race.SteelSource(HANDLE).goto("https://en.wikipedia.org/wiki/Cat")
+
+
+def test_a_session_steel_cannot_vouch_for_is_treated_as_lost(monkeypatch):
+    def navigate(*a, **k):
+        raise steel_client.SteelError("boom")
+
+    def session_info(sid):
+        raise steel_client.SteelError("api.steel.dev unreachable")
+
+    monkeypatch.setattr(race.steel_client, "navigate", navigate)
+    monkeypatch.setattr(race.steel_client, "session_info", session_info)
+    with pytest.raises(steel_client.SteelSessionLost):
+        race.SteelSource(HANDLE).goto("https://en.wikipedia.org/wiki/Cat")
 
 
 def test_steel_source_open_starts_a_session_with_both_timeouts(monkeypatch):

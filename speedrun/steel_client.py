@@ -107,8 +107,12 @@ def run(args: list[str], timeout: float = DEFAULT_TIMEOUT_S):
     if proc.returncode != 0 or not isinstance(envelope, dict) or envelope.get("success") is not True:
         detail = envelope.get("error") if isinstance(envelope, dict) else None
         detail = detail or stdout.strip()[:500] or (proc.stderr or "").strip()[:500] or "no output"
-        raise SteelError(f"`{shown}` failed (exit {proc.returncode}): {detail}", argv=argv,
-                         exit_code=proc.returncode, stdout=stdout, stderr=proc.stderr or "")
+        # 'Session "<name>" is no longer reachable': the next command under that name would
+        # silently start a NEW session (docs/steel-json-shapes.md, trap 1), so this is a lost
+        # session, never an ordinary failure worth retrying.
+        cls = SteelSessionLost if "no longer reachable" in str(detail) else SteelError
+        raise cls(f"`{shown}` failed (exit {proc.returncode}): {detail}", argv=argv,
+                  exit_code=proc.returncode, stdout=stdout, stderr=proc.stderr or "")
     return envelope.get("data")
 
 

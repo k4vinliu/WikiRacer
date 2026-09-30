@@ -166,13 +166,20 @@ class SteelSource:
 
     def __init__(self, handle: SessionHandle | None = None, *, started_at: float | None = None,
                  session_timeout_ms: int = 900_000, name_prefix: str = "wikiracer",
-                 clock: Callable[[], float] = time.monotonic, expiry_margin_s: float = 20.0):
+                 clock: Callable[[], float] = time.monotonic,
+                 wall_clock: Callable[[], float] | None = None, expiry_margin_s: float = 20.0):
+        # Two clocks. `clock` stamps arrivals, on the same clock as the EventLog. `wall_clock`
+        # measures the session's age against Steel's lifetime, and has to keep counting while
+        # the machine sleeps: time.monotonic() is mach_absolute_time() on macOS and stops during
+        # sleep, which let a real race outlive its session (docs/steel-json-shapes.md, trap 1).
+        # `started_at` is on the wall clock.
         self.handle = handle
         self.clock = clock
+        self.wall_clock = wall_clock or (lambda: time.time())
         self.session_timeout_ms = session_timeout_ms
         self.name_prefix = name_prefix
         self.expiry_margin_s = expiry_margin_s
-        self._started_at = started_at if started_at is not None else (clock() if handle else None)
+        self._started_at = started_at if started_at is not None else (self.wall_clock() if handle else None)
         self._lock = threading.Lock()
 
     @property
@@ -185,7 +192,7 @@ class SteelSource:
 
     def open(self) -> None:
         if self.handle is None:
-            self._started_at = self.clock()
+            self._started_at = self.wall_clock()
             self.handle = steel_client.start_session(
                 session_timeout_ms=self.session_timeout_ms, inactivity_timeout_ms=0,
                 name_prefix=self.name_prefix)
@@ -194,19 +201,37 @@ class SteelSource:
         """Navigate, then read the page. Returns (html, when navigation finished): the
         moment the agent arrived, not the moment we got round to reading the HTML."""
         self._guard()
-        steel_client.navigate(self.handle.name, url)
-        loaded_at = self.clock()
-        return steel_client.content(self.handle.name), loaded_at
+        try:
+            steel_client.navigate(self.handle.name, url)
+            loaded_at = self.clock()
+            return steel_client.content(self.handle.name), loaded_at
+        except steel_client.SteelSessionLost:
+            raise
+        except steel_client.SteelError as e:
+            # Before anyone retries: a command sent under a dead session's name makes Steel
+            # silently start a NEW, invisible session (docs/steel-json-shapes.md, trap 1). So a
+            # failure only stays retryable while Steel still vouches for this session.
+            if not self._still_live():
+                raise steel_client.SteelSessionLost(
+                    f"Steel session {self.handle.name} ({self.handle.id}) is no longer live: {e}") from e
+            raise
+
+    def _still_live(self) -> bool:
+        try:
+            return steel_client.session_info(self.handle.id).get("status") == "live"
+        except steel_client.SteelError:
+            return False  # can't tell, and a blind retry is how the invisible session happens
 
     def _guard(self) -> None:
         if self.handle is None or self._started_at is None:
             raise steel_client.SteelSessionLost("SteelSource.goto() before open()")
         lifetime_s = self.handle.session_timeout_ms / 1000
-        if self.clock() - self._started_at > lifetime_s - self.expiry_margin_s:
+        if self.wall_clock() - self._started_at > lifetime_s - self.expiry_margin_s:
             raise steel_client.SteelSessionLost(
                 f"Steel session {self.handle.name} is within {self.expiry_margin_s:g}s of its "
                 f"{lifetime_s:g}s lifetime. Refusing to send it commands, because Steel would "
-                "silently start a fresh session on about:blank (docs/steel-json-shapes.md, trap 1).")
+                "silently start a fresh, invisible session under the same name "
+                "(docs/steel-json-shapes.md, trap 1).")
 
     def close(self) -> None:
         """Stop the session, re-sending the idempotent stop BY NAME every time, so a session
@@ -360,9 +385,11 @@ class AgentRace:
                  source: Any, log: ev.EventLog, rules: GameRules, picker: PickerFns,
                  resolve_titles: Callable[[list[str]], dict[str, str | None]] = canonicalize,
                  client: Any = None, stop: threading.Event | None = None,
-                 go: threading.Event | None = None, go_timeout_s: float = DEFAULT_GO_TIMEOUT_S):
+                 go: threading.Event | None = None, go_timeout_s: float = DEFAULT_GO_TIMEOUT_S,
+                 hop_delay_s: float = 0.0):
         self.start_input, self.target_input = start, target
         self.model, self.max_hops, self.use_find_target = model, max_hops, use_find_target
+        self.hop_delay_s = hop_delay_s  # the difficulty's wait on each page before the agent looks
         self.source, self.log, self.rules = source, log, rules
         self.picker, self.resolve_titles, self.client = picker, resolve_titles, client
         self.stop = stop or threading.Event()
@@ -460,6 +487,12 @@ class AgentRace:
         current, target, html = self.start_title, self.target_title, self._html
         visited = [current]
         for hop in range(1, self.max_hops + 1):
+            # The difficulty's handicap (config.tiers): the agent waits on the page BEFORE it
+            # looks for its next link, then clicks the moment it has chosen, so it never sits on a
+            # link it has already found, the target included. A stop (the human won) ends the
+            # wait at once.
+            if self.hop_delay_s > 0 and self.stop.wait(self.hop_delay_s):
+                raise _Stopped()
             self._check_stop()
             cands = [c for c in self.rules.extract_candidates(html)
                      if not self.rules.titles_match(c.title, current)]
@@ -526,11 +559,11 @@ class AgentRace:
 def run_race(start: str, target: str, model: str, max_hops: int = 25, *, use_find_target: bool = True,
              source: Any = None, log: ev.EventLog | None = None, picker: PickerFns | None = None,
              client: Any = None, stop: threading.Event | None = None,
-             go: threading.Event | None = None) -> RaceResult:
+             go: threading.Event | None = None, hop_delay_s: float = 0.0) -> RaceResult:
     """PLAN.md §2.2's entry point: `start`/`target` exactly as typed (title or URL). Builds
     the real pieces (Steel, Lane B's rules, the LLM picker) for anything not handed in."""
     race = AgentRace(start, target, model=model, max_hops=max_hops, use_find_target=use_find_target,
                      source=source or SteelSource(name_prefix="wikiracer-cli"),
                      log=log or ev.EventLog(), rules=lane_b_rules(), picker=picker or llm_picker(),
-                     resolve_titles=canonicalize, client=client, stop=stop, go=go)
+                     resolve_titles=canonicalize, client=client, stop=stop, go=go, hop_delay_s=hop_delay_s)
     return race.run()

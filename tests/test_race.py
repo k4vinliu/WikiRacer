@@ -258,6 +258,57 @@ def test_two_navigation_failures_in_a_row_end_the_race():
     assert src.closed
 
 
+def test_a_lost_session_is_never_retried():
+    # A retry under a dead session's name is exactly what makes Steel start an invisible one.
+    class LosingSource(FakeSource):
+        def goto(self, url):
+            if self.visits:  # the start article loaded; the first hop finds the session gone
+                self.calls += 1
+                raise race.steel_client.SteelSessionLost("Steel session wikiracer-x is no longer live")
+            return super().goto(url)
+
+    wiki = FakeWiki({"A": ["T"], "T": []})
+    src = LosingSource(wiki)
+    r, log, _ = make(wiki, "A", "T", source=src)
+    result = r.run()
+    assert result.reason == "error" and "no longer live" in result.error
+    assert src.calls == 2  # the start article, then one failed hop, and no retry
+    assert src.closed
+
+
+# --------------------------------------------------------------------------- the difficulty wait
+
+
+def test_the_agent_waits_before_it_looks_for_a_link_then_clicks_at_once():
+    # The wait comes at the start of each hop, before the agent even reads the page. Once it
+    # has chosen, it clicks at once, so it never sits on a link it has already found, the
+    # target included (the user's call, 2026-09-13).
+    wiki = FakeWiki({"A": ["B"], "B": ["T"], "T": []})
+    picker, _ = scripted("B")
+    r, log, _ = make(wiki, "A", "T", picker, hop_delay_s=0.4)
+    assert r.run().won
+    thinking, picks, arrives = ([e for e in log.events if e["t"] == t] for t in ("thinking", "pick", "arrive"))
+    assert thinking[0]["at"] >= 400                    # waited before looking at the start page
+    assert thinking[1]["at"] - arrives[0]["at"] >= 400  # and again on the next page
+    # Clicked straight after choosing, including the find_target win on the last hop.
+    assert all(a["at"] - p["at"] < 200 for p, a in zip(picks, arrives))
+
+
+def test_the_wait_ends_the_moment_the_race_is_stopped():
+    # The human won while the agent was waiting on a page: it must not look, must not click,
+    # and must let go of the browser.
+    wiki = FakeWiki({"A": ["T"], "T": []})
+    stop = threading.Event()
+    r, log, src = make(wiki, "A", "T", hop_delay_s=30.0, stop=stop)
+    threading.Timer(0.2, stop.set).start()
+    started = time.monotonic()
+    result = r.run()
+    assert time.monotonic() - started < 5
+    assert result.error == "stopped" and src.visits == ["A"]
+    assert kinds(log) == ["ready"]  # no thinking, no pick, no arrive: it never started looking
+    assert src.closed
+
+
 def test_arrive_is_stamped_when_the_page_finished_loading():
     now = [1000.0]
     log = ev.EventLog(clock=lambda: now[0])

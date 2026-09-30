@@ -147,6 +147,17 @@ def test_a_hung_cli_raises_steel_timeout(steel):
         sc.content("s")
 
 
+def test_a_session_steel_calls_unreachable_is_lost_not_just_failed(steel):
+    # The shape is verbatim from a reproduction on 2026-09-12. The next command under that name
+    # silently started a NEW session (trap 1), so this can't look like an ordinary failure.
+    lost = json.dumps({"error": 'Session "wikiracer-srv-1789267891-ab12" is no longer reachable. '
+                                "Run `steel browser start` to create a new one.",
+                       "error_code": "internal_error", "success": False}, separators=(",", ":"))
+    steel({("browser", "content"): (1, lost + "\n")})
+    with pytest.raises(sc.SteelSessionLost, match="no longer reachable"):
+        sc.content("wikiracer-srv-1789267891-ab12")
+
+
 def test_unparseable_stdout_is_an_error_even_with_exit_zero(steel):
     steel({("browser", "navigate"): (0, "definitely not json")})
     with pytest.raises(sc.SteelError):

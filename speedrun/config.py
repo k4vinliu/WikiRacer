@@ -40,17 +40,32 @@ class ConfigError(RuntimeError):
 class Tier:
     model: str
     use_find_target: bool
+    hop_delay_s: float  # the agent waits this long on each page before it looks for a link
 
 
-def tiers(env: Mapping[str, str] | None = None) -> dict[str, Tier]:
-    """FRONTEND.md §5.5: difficulty moves two honest levers, the pair and the agent, and never
-    a handicap. Easy switches find_target off, so the agent doesn't look ahead. Hard is Sonnet 5
-    unless WIKIRACER_HARD_MODEL says otherwise (FRONTEND.md §12.2 is still an open question)."""
+HOP_DELAY_S = {"easy": 10.0, "medium": 5.0, "hard": 2.0}
+
+
+def tiers(env: Mapping[str, str] | None = None, hop_delay_s: float | None = None) -> dict[str, Tier]:
+    """The three difficulty tiers (FRONTEND.md §5.5). Easy switches find_target off, so the agent
+    doesn't look ahead. Hard is Sonnet 5 unless WIKIRACER_HARD_MODEL says otherwise
+    (FRONTEND.md §12.2 is still an open question).
+
+    Every tier also makes the agent wait on each page before it looks for its next link: 10 s,
+    5 s, 2 s. Once it has chosen, it clicks at once, so it never sits on a link it has already
+    found. §5.5 ruled out any such handicap, but the team added one on 2026-09-13 after finding
+    that no human could win on any tier. `hop_delay_s` (the `--hop-delay` flag) sets one wait for
+    every tier, and 0 shows the agent at full speed."""
     env = os.environ if env is None else env
+
+    def wait(tier: str) -> float:
+        return HOP_DELAY_S[tier] if hop_delay_s is None else float(hop_delay_s)
+
     return {
-        "easy": Tier(model=DEFAULT_MODEL, use_find_target=False),
-        "medium": Tier(model=DEFAULT_MODEL, use_find_target=True),
-        "hard": Tier(model=(env.get(HARD_MODEL_ENV) or HARD_MODEL).strip(), use_find_target=True),
+        "easy": Tier(model=DEFAULT_MODEL, use_find_target=False, hop_delay_s=wait("easy")),
+        "medium": Tier(model=DEFAULT_MODEL, use_find_target=True, hop_delay_s=wait("medium")),
+        "hard": Tier(model=(env.get(HARD_MODEL_ENV) or HARD_MODEL).strip(), use_find_target=True,
+                     hop_delay_s=wait("hard")),
     }
 
 

@@ -64,6 +64,21 @@ hanging.
 |---|---|
 | `--page-source http` | No browser: the agent reads Wikipedia over HTTPS. Same loop, same extractor, same LLM, but no live view. The fallback if Steel is down (`FRONTEND.md` §9.3). |
 | `--picker first` | **Dev only.** Always takes the first unvisited link, and needs no API key. It exercises Steel, the loop and the event stream. It will not reach your target. |
+| `--max-hops N` | The agent's hop limit (default 25). The app never sends one, so this is how to run `FRONTEND.md` §10's R6 check (`--max-hops 3`). |
+| `--hop-delay S` | One wait on every page, whatever the tier. `--hop-delay 0` shows the agent at full speed. |
+
+### Difficulty
+
+| Tier | Agent | Takes a visible target without asking Claude | Waits on each page before looking |
+|---|---|---|---|
+| Easy | Claude Haiku 4.5 | no | 10 s |
+| Medium | Claude Haiku 4.5 | yes | 5 s |
+| Hard | Claude Sonnet 5 | yes | 2 s |
+
+The wait comes at the start of every hop, before the agent looks for its next link. Once it has
+chosen, it clicks straight away, so it never sits on a link it has already found, the target
+included. `FRONTEND.md` §5.5 first ruled out any per-hop delay; the team added one on
+2026-09-13 after finding that no human could win on any tier.
 
 ## The headless agent (Lane C's regression harness)
 
@@ -76,9 +91,10 @@ python -m speedrun.cli --start "Snakes" --target "WWII"      # both ends are red
 steel browser sessions                                          # must list nothing afterwards
 ```
 
-`--difficulty easy|medium|hard`, `--max-hops N`, `--model`, `--page-source http` and
-`--picker first` all work here too. Exit code: 0 if the agent won, 1 if it didn't, 2 for a
-setup problem, 130 after Ctrl+C. Ctrl+C still releases the browser.
+`--difficulty easy|medium|hard`, `--max-hops N`, `--hop-delay S`, `--model`, `--page-source http`
+and `--picker first` all work here too; `--hop-delay 0` makes the regression runs quick. Exit
+code: 0 if the agent won, 1 if it didn't, 2 for a setup problem, 130 after Ctrl+C. Ctrl+C still
+releases the browser.
 
 ## Tests
 
@@ -111,6 +127,7 @@ python -m speedrun.steel_client     # live Steel smoke test: spends one short se
 | *speedrun/picker.py isn't in this checkout* | Lane B's picker isn't merged into your branch yet. Pull it, or use `--picker first` to test the rest. |
 | The agent seems to hang | `steel browser sessions`, then `steel browser stop --all`. The server also stops leftover `wikiracer-srv-*` sessions every time it starts. |
 | A session died mid-race | Almost certainly its `--session-timeout`, which is create-time only and defaults to 5 minutes. We always pass 15 minutes. |
+| The Mac slept (lid closed) during a race | The Steel session's 15-minute clock keeps running while the Mac sleeps. The agent stops with an error rather than carry on in a hidden browser, so start the race again. Keep the demo machine awake and plugged in. |
 | `CERTIFICATE_VERIFY_FAILED` | python.org's macOS Python ships no CA bundle. The agent already falls back to `/etc/ssl/cert.pem`. For your own scripts, run *Install Certificates.command* in `/Applications/Python 3.x/`. |
 | Wikipedia HTTP 429 | Rate-limited. Slow down, then retry in a minute. The agent retries a page load once, then stops cleanly. |
 
