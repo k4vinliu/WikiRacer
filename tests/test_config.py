@@ -54,6 +54,18 @@ def test_hard_runs_sonnet_unless_the_team_overrides_it():
     assert config.tiers(env={"WIKIRACER_HARD_MODEL": "claude-haiku-4-5"})["hard"].model == "claude-haiku-4-5"
 
 
+def test_every_tier_makes_the_agent_wait_before_each_click():
+    # Added 2026-09-13 at the team's request, overriding FRONTEND.md §5.5's "no per-hop delay":
+    # without a pause, no human could win on any tier.
+    tiers = config.tiers(env={})
+    assert [tiers[t].hop_delay_s for t in ("easy", "medium", "hard")] == [10.0, 5.0, 2.0]
+
+
+def test_one_override_sets_every_tiers_wait():
+    # `--hop-delay 0` shows the agent at full speed, which a judge may well ask to see.
+    assert {t.hop_delay_s for t in config.tiers(env={}, hop_delay_s=0).values()} == {0}
+
+
 # --------------------------------------------------------------------------- the Anthropic client
 
 

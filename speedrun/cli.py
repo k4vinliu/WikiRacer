@@ -46,13 +46,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="http = no browser, same loop (FRONTEND.md §9.3 lever 2)")
     ap.add_argument("--picker", choices=("llm", "first"), default="llm",
                     help="first = DEV ONLY: always the first unvisited link, no API key needed")
-    return ap.parse_args(argv)
+    ap.add_argument("--hop-delay", type=float, default=None, metavar="SECONDS",
+                    help="the agent's wait on each page before it looks for a link (default: the "
+                         "tier's, easy 10, medium 5, hard 2); 0 races at full speed")
+    args = ap.parse_args(argv)
+    if args.hop_delay is not None and not 0 <= args.hop_delay <= 60:
+        ap.error("--hop-delay must be from 0 to 60 seconds")
+    return args
 
 
-def settings(args: argparse.Namespace, env=None) -> tuple[str, bool]:
-    """(model, use_find_target) for these arguments: the tier's, unless a flag overrides it."""
-    tier = config.tiers(env)[args.difficulty]
-    return args.model or tier.model, tier.use_find_target and not args.no_find_target
+def settings(args: argparse.Namespace, env=None) -> tuple[str, bool, float]:
+    """(model, use_find_target, hop_delay_s) for these arguments: the tier's, unless a flag
+    overrides it."""
+    tier = config.tiers(env, hop_delay_s=args.hop_delay)[args.difficulty]
+    return args.model or tier.model, tier.use_find_target and not args.no_find_target, tier.hop_delay_s
 
 
 def summarize(result: RaceResult) -> str:
@@ -121,7 +128,7 @@ def run_headless(agent: race.AgentRace, err: TextIO | None = None) -> tuple[Race
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    model, use_find_target = settings(args)
+    model, use_find_target, hop_delay_s = settings(args)
     client = None
     try:
         if args.picker == "llm":
@@ -146,10 +153,10 @@ def main(argv: list[str] | None = None) -> int:
     log.add_listener(console.print_event)
     agent = race.AgentRace(args.start, args.target, model=model, max_hops=args.max_hops,
                            use_find_target=use_find_target, source=source, log=log, rules=rules,
-                           picker=picker, client=client)
+                           picker=picker, client=client, hop_delay_s=hop_delay_s)
     print(f"racing {args.start!r} -> {args.target!r} | {args.difficulty}: {model}, find_target "
-          f"{'on' if use_find_target else 'off'} | pages from {args.page_source} | picker {args.picker}",
-          file=sys.stderr)
+          f"{'on' if use_find_target else 'off'}, waits {hop_delay_s:g}s on each page | "
+          f"pages from {args.page_source} | picker {args.picker}", file=sys.stderr)
     result, interrupted = run_headless(agent)
     if interrupted:
         return 130

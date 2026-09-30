@@ -50,13 +50,33 @@ verified above.
    `{"data":"about:blank","success":true}`, 1.56 s (that is a cold start), and the later
    `steel browser stop` for that name reported stopping it. A typo'd, expired or
    already-stopped name therefore never errors: the next `navigate` drives a fresh, invisible
-   browser while the projector shows the dead one. `steel_client` / `race.SteelSource` defend
-   in three places:
-   - never send a command to a session past its lifetime (`SteelSource._guard`);
-   - `content()` treats a page under 1 KB as `SteelSessionLost` (no Wikipedia article is that small);
-   - only the thread that owns a session ever stops it, *after its last command*, and every
-     `close()` re-sends the idempotent stop by name — so a session re-created by a stray
-     command is still torn down.
+   browser while the projector shows the dead one.
+
+   **It bit a real race the same evening.** The Mac slept (lid closed) 3 s after a race's
+   session started, and stayed asleep through the session's whole 15-minute lifetime. On
+   waking, `content` failed, the race retried once, and the retry's `navigate` silently created
+   session `4d04c4ad`. The race then ran, and won, on that invisible browser while the live
+   view pointed at the expired one. Reproduced on purpose by releasing a session cloud-side
+   with `steel sessions release <id>`. First, `content` under the old name exits 1:
+
+   ```json
+   {"error":"Session \"probe-lost-1789267891\" is no longer reachable. Run `steel browser start` to create a new one.","error_code":"internal_error","success":false}
+   ```
+
+   Then `navigate` under the same name **exits 0**, and `steel browser sessions` now maps the
+   name to a brand-new session (`a8825342`, created 7 s later).
+
+   `steel_client` / `race.SteelSource` defend in five places:
+   - `SteelSource` measures a session's age on the **wall clock**, and never sends a command
+     within 20 s of its lifetime. It first used `time.monotonic()`, which on macOS is
+     `mach_absolute_time()` and **stops while the machine sleeps**; Steel's clock doesn't.
+   - "no longer reachable" is raised as `SteelSessionLost`, which the race never retries.
+   - When any other command fails, `SteelSource` asks `steel sessions get <id>` whether the
+     session is still `live` before anyone retries, and treats "not live" or "can't tell" as lost.
+   - `content()` treats a page under 1 KB as `SteelSessionLost`; no Wikipedia article is that small.
+   - Only the thread that owns a session ever stops it, *after its last command*, and every
+     `close()` re-sends the idempotent stop by name, so a session re-created by a stray
+     command is still torn down. That is why the incident above leaked nothing.
 2. **`liveUrl` is the dashboard, not the player** (Q7). The same dashboard URL appears under
    three names: `liveUrl` (`browser start`), `viewerUrl` (`browser sessions`),
    `sessionViewerUrl` (`sessions get`). The player is only in `debugUrl`.

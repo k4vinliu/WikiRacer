@@ -73,3 +73,15 @@ describe("AgentPanel's live-view caption", () => {
     expect(document.body.textContent).toContain("driven by the mock feed");
   });
 });
+
+describe("AgentPanel's layout", () => {
+  it("lets the agent column shrink below its content", () => {
+    // jsdom has no layout, so this pins the class that decides it. A flex item defaults to
+    // min-width:auto ("never narrower than my content"). The route line along the bottom
+    // never wraps, so near the end of a race it outgrew the column, which then pushed past
+    // the window edge while the 16:9 live view grew to match (reproduced in Chrome at
+    // 1280x800 on 2026-09-13). With min-w-0 the line is clipped instead.
+    const { container } = render(<AgentPanel />);
+    expect((container.firstElementChild as HTMLElement).className.split(/\s+/)).toContain("min-w-0");
+  });
+});

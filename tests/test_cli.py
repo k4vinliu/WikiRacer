@@ -38,14 +38,20 @@ def test_start_and_target_are_required():
 
 
 @pytest.mark.parametrize("extra, expected", [
-    ((), ("claude-haiku-4-5", True)),
-    (("--difficulty", "easy"), ("claude-haiku-4-5", False)),
-    (("--difficulty", "hard"), ("claude-sonnet-5", True)),
-    (("--no-find-target",), ("claude-haiku-4-5", False)),
-    (("--model", "claude-sonnet-5"), ("claude-sonnet-5", True)),
+    ((), ("claude-haiku-4-5", True, 5.0)),
+    (("--difficulty", "easy"), ("claude-haiku-4-5", False, 10.0)),
+    (("--difficulty", "hard"), ("claude-sonnet-5", True, 2.0)),
+    (("--no-find-target",), ("claude-haiku-4-5", False, 5.0)),
+    (("--model", "claude-sonnet-5"), ("claude-sonnet-5", True, 5.0)),
+    (("--hop-delay", "0"), ("claude-haiku-4-5", True, 0.0)),
 ])
-def test_the_tier_sets_the_model_and_find_target(extra, expected):
+def test_the_tier_sets_the_model_find_target_and_wait(extra, expected):
     assert cli.settings(args(*extra), env={}) == expected
+
+
+def test_a_negative_wait_is_refused():
+    with pytest.raises(SystemExit):
+        args("--hop-delay", "-2")
 
 
 def test_summaries_say_how_it_ended():

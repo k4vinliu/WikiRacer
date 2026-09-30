@@ -34,7 +34,10 @@ export function Race() {
         <div className="flex min-h-0 w-[896px] shrink-0">
           <PlayerPanel />
         </div>
-        <div className="flex min-h-0 flex-1">
+        {/* min-w-0: a flex item is never narrower than its content by default, and the
+            agent's route line never wraps, so a long route near the end of a race forced
+            this column past the window edge. Pinned by Race.test.tsx. */}
+        <div className="flex min-h-0 min-w-0 flex-1">
           <AgentPanel />
         </div>
       </main>

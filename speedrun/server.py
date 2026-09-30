@@ -22,7 +22,7 @@ One race at a time: a new POST /race stops the previous one. If a race's event s
 (FRONTEND.md §2.7), because a leaked Steel session is the one unacceptable outcome. Only
 pages served from this machine may drive it, because a race spends Steel and Anthropic credit.
 
-    python3.11 -m speedrun.server [--page-source steel|http] [--picker llm|first]
+    python3.11 -m speedrun.server [--page-source steel|http] [--picker llm|first] [--max-hops N] [--hop-delay S]
 """
 
 from __future__ import annotations
@@ -69,9 +69,11 @@ class RaceParams:
     model: str
     use_find_target: bool
     max_hops: int
+    hop_delay_s: float  # the tier's wait on each page before the agent looks (config.tiers)
 
 
-def parse_race_request(body: Any, tiers: Mapping[str, config.Tier]) -> RaceParams:
+def parse_race_request(body: Any, tiers: Mapping[str, config.Tier],
+                       default_max_hops: int = config.DEFAULT_MAX_HOPS) -> RaceParams:
     if not isinstance(body, dict):
         raise BadRequest("the body must be a JSON object")
 
@@ -95,10 +97,10 @@ def parse_race_request(body: Any, tiers: Mapping[str, config.Tier]) -> RaceParam
         raise BadRequest("'find_target' must be true or false")
     max_hops = body.get("max_hops")
     if max_hops is None:
-        max_hops = config.DEFAULT_MAX_HOPS
+        max_hops = default_max_hops  # sseFeed.ts never sends one; the server's --max-hops decides
     elif isinstance(max_hops, bool) or not isinstance(max_hops, int) or not 1 <= max_hops <= 100:
         raise BadRequest("'max_hops' must be an integer from 1 to 100")
-    return RaceParams(start, target, difficulty, tier.model, find_target, max_hops)
+    return RaceParams(start, target, difficulty, tier.model, find_target, max_hops, tier.hop_delay_s)
 
 
 def origin_allowed(origin: str | None, extra: Iterable[str] = ()) -> bool:
@@ -165,11 +167,13 @@ class Run:
 
 class RaceManager:
     def __init__(self, factory: Factory, *, tiers: Mapping[str, config.Tier] | None = None,
+                 default_max_hops: int = config.DEFAULT_MAX_HOPS,
                  first_connect_grace_s: float = 30.0, drop_grace_s: float = 5.0,
                  on_event: Callable[[str, dict], None] | None = None,
                  on_note: Callable[[str], None] | None = None):
         self.factory = factory
         self.tiers = dict(tiers) if tiers is not None else config.tiers()
+        self.default_max_hops = default_max_hops
         self.first_connect_grace_s = first_connect_grace_s
         self.drop_grace_s = drop_grace_s
         self.on_event = on_event
@@ -388,7 +392,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             body = self._read_json()  # always drained: an unread body can reset the connection
             if parts == ["race"]:
-                params = parse_race_request(body, self.app.manager.tiers)
+                params = parse_race_request(body, self.app.manager.tiers, self.app.manager.default_max_hops)
                 run = self.app.manager.create(params)
                 return self._json(201, {"id": run.id, "events": f"/events?race={run.id}"})
             if len(parts) == 3 and parts[0] == "race" and parts[2] == "go":
@@ -477,7 +481,8 @@ def build_factory(page_source: str, picker_kind: str, client: Any) -> Factory:
             source = race.HttpSource()
         return race.AgentRace(params.start, params.target, model=params.model, max_hops=params.max_hops,
                               use_find_target=params.use_find_target, source=source, log=log,
-                              rules=race.lane_b_rules(), picker=picker, client=client, stop=stop, go=go)
+                              rules=race.lane_b_rules(), picker=picker, client=client, stop=stop, go=go,
+                              hop_delay_s=params.hop_delay_s)
     return factory
 
 
@@ -485,7 +490,17 @@ def _note(msg: str) -> None:
     print(f"[server] {msg}", file=sys.stderr, flush=True)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _hop_limit(text: str) -> int:
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if not 1 <= value <= 100:
+        raise argparse.ArgumentTypeError("must be from 1 to 100")
+    return value
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser(prog="python3.11 -m speedrun.server",
                                  description="The WikiRacer agent server (Lane C). Open the app with ?agent=real.")
     ap.add_argument("--host", default=DEFAULT_HOST, help="keep this 127.0.0.1 (default)")
@@ -497,18 +512,31 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--allow-origin", action="append", default=[], metavar="ORIGIN",
                     help="another page origin allowed to drive the agent")
     ap.add_argument("--no-preflight", action="store_true", help="skip the Anthropic and Steel checks")
+    ap.add_argument("--max-hops", type=_hop_limit, default=config.DEFAULT_MAX_HOPS,
+                    help=f"the agent's hop limit (default {config.DEFAULT_MAX_HOPS}); the app never sends one")
+    ap.add_argument("--hop-delay", type=float, default=None, metavar="SECONDS",
+                    help="one wait on every page before the agent looks for a link, whatever the "
+                         "tier (default: easy 10, medium 5, hard 2); 0 shows the agent at full speed")
     ap.add_argument("-v", "--verbose", action="store_true", help="log every HTTP request")
     args = ap.parse_args(argv)
+    if args.hop_delay is not None and not 0 <= args.hop_delay <= 60:
+        ap.error("--hop-delay must be from 0 to 60 seconds")
+    return args
 
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     config.load_env()
-    health: dict[str, Any] = {"page_source": args.page_source, "picker": args.picker,
-                              "models": {k: t.model for k, t in config.tiers().items()}, "detail": {}}
+    tiers = config.tiers(hop_delay_s=args.hop_delay)
+    health: dict[str, Any] = {"page_source": args.page_source, "picker": args.picker, "max_hops": args.max_hops,
+                              "models": {k: t.model for k, t in tiers.items()},
+                              "hop_delay_s": {k: t.hop_delay_s for k, t in tiers.items()}, "detail": {}}
     client = None
     if args.picker == "llm":
         try:
             client = config.make_client()
             if not args.no_preflight:
-                config.preflight_anthropic(client, {t.model for t in config.tiers().values()})
+                config.preflight_anthropic(client, {t.model for t in tiers.values()})
             health["anthropic_key"] = True
         except config.ConfigError as e:
             client = None
@@ -530,7 +558,8 @@ def main(argv: list[str] | None = None) -> int:
         health["steel"] = False
         health["detail"]["steel"] = "not used (--page-source http)"
 
-    manager = RaceManager(build_factory(args.page_source, args.picker, client),
+    manager = RaceManager(build_factory(args.page_source, args.picker, client), tiers=tiers,
+                          default_max_hops=args.max_hops,
                           on_event=lambda rid, e: console.print_event(e, prefix=f"{rid} "), on_note=_note)
     httpd = make_server(manager, args.host, args.port, health=lambda: health,
                         allowed_origins=args.allow_origin, verbose=args.verbose)
@@ -542,7 +571,9 @@ def main(argv: list[str] | None = None) -> int:
 
     signal.signal(signal.SIGTERM, _terminate)
     _note(f"agent server on http://{args.host}:{httpd.server_address[1]}. Page source: {args.page_source}, "
-          f"picker: {args.picker}, models: {health['models']}. Open the app with ?agent=real. "
+          f"picker: {args.picker}, max hops: {args.max_hops}, models: {health['models']}, "
+          f"wait on each page (s): {health['hop_delay_s']}. "
+          "Open the app with ?agent=real. "
           "Ctrl+C stops it and releases the Steel session.")
     try:
         httpd.serve_forever(poll_interval=0.25)

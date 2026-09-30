@@ -341,3 +341,54 @@ def test_bad_bodies_are_400(h):
 
 def test_the_server_only_listens_on_loopback():
     assert server.DEFAULT_HOST == "127.0.0.1" and server.DEFAULT_PORT == 8848
+
+
+# --------------------------------------------------------------------------- --max-hops (FRONTEND.md §10 R6)
+
+
+def test_the_server_hop_limit_applies_when_the_page_sends_none():
+    # R6 runs `?agent=real --max-hops 3`, and sseFeed.ts never sends max_hops, so the limit
+    # has to come from the server's own command line.
+    tiers = config.tiers(env={})
+    assert server.parse_race_request({"start": "Cat", "target": "Dog"}, tiers, default_max_hops=3).max_hops == 3
+    assert server.parse_race_request({"start": "Cat", "target": "Dog", "max_hops": 7}, tiers,
+                                     default_max_hops=3).max_hops == 7
+
+
+def test_new_races_get_the_managers_hop_limit():
+    h = Harness(default_max_hops=2)
+    try:
+        start_race(h)
+        assert h.params_seen[-1].max_hops == 2
+    finally:
+        h.close()
+
+
+def test_max_hops_is_a_server_flag():
+    assert server.parse_args([]).max_hops == config.DEFAULT_MAX_HOPS
+    assert server.parse_args(["--max-hops", "3"]).max_hops == 3
+    with pytest.raises(SystemExit):
+        server.parse_args(["--max-hops", "0"])
+
+
+# --------------------------------------------------------------------------- the difficulty wait
+
+
+def test_difficulty_sets_how_long_the_agent_waits_before_each_click(h):
+    for tier, seconds in (("easy", 10.0), ("medium", 5.0), ("hard", 2.0)):
+        start_race(h, difficulty=tier)
+        assert h.params_seen[-1].hop_delay_s == seconds
+
+
+def test_hop_delay_is_a_server_flag():
+    assert server.parse_args([]).hop_delay is None  # None means each tier's own wait
+    assert server.parse_args(["--hop-delay", "0"]).hop_delay == 0.0
+    with pytest.raises(SystemExit):
+        server.parse_args(["--hop-delay", "-1"])
+
+
+def test_the_real_factory_hands_the_wait_to_the_race():
+    params = server.RaceParams(start="Cat", target="Dog", difficulty="easy", model="claude-haiku-4-5",
+                               use_find_target=False, max_hops=25, hop_delay_s=10.0)
+    agent = server.build_factory("http", "first", None)(params, ev.EventLog(), threading.Event(), threading.Event())
+    assert agent.hop_delay_s == 10.0
