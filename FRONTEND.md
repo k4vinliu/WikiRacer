@@ -732,7 +732,7 @@ and it's the stage fallback if Steel dies.
 export function mockFeed(pair: Pair, speed = 1): AgentFeed { /* scripted hops, realistic gaps */ }
 export function makeFeed(pair: Pair): AgentFeed {
   return new URLSearchParams(location.search).get("agent") === "real"
-    ? sseFeed("http://127.0.0.1:8848") : mockFeed(pair);
+    ? sseFeed(import.meta.env.VITE_AGENT_BASE ?? "/agent") : mockFeed(pair);
 }
 ```
 
@@ -766,7 +766,7 @@ the copy.
 `speedrun/server.py` (**Lane C**, ~90 lines, stdlib, bind `127.0.0.1`): `POST /race` starts a run,
 `POST /race/{id}/go` is the gun, `GET /events` is the SSE stream **replaying the full log on
 connect** (§2.7), `POST /stop` kills the run and the Steel session, `GET /health` returns
-`{ok, anthropic_key, steel}`.
+`{ok, llm_key, steel}`.
 
 `speedrun/race.py` changes in six places: takes canonical titles; emits §6.1 events via an `emit`
 callback; waits on a `go` flag; checks a `stop_flag` each hop; prewarms the Steel session during

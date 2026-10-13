@@ -336,13 +336,13 @@ def first_link_picker() -> PickerFns:
 
 
 _ANTHROPIC_HINTS = {
-    "AuthenticationError": "Anthropic rejected the API key (check ANTHROPIC_API_KEY in .env)",
-    "PermissionDeniedError": "This Anthropic key isn't allowed to do that",
-    "NotFoundError": "Anthropic doesn't know that model (check the model name)",
-    "BadRequestError": "Anthropic rejected the request",
-    "RateLimitError": "Anthropic is rate-limiting us",
-    "APITimeoutError": "Anthropic took too long to answer",
-    "APIConnectionError": "Couldn't reach Anthropic",
+    "AuthenticationError": "The LLM provider rejected the API key (check LLM_API_KEY in .env)",
+    "PermissionDeniedError": "This API key isn't allowed to do that",
+    "NotFoundError": "The LLM provider doesn't know that model (check LLM_*_MODEL)",
+    "BadRequestError": "The LLM provider rejected the request",
+    "RateLimitError": "The LLM provider is rate-limiting us",
+    "APITimeoutError": "The LLM provider took too long to answer",
+    "APIConnectionError": "Couldn't reach the LLM API",
 }
 
 

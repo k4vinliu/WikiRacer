@@ -94,12 +94,13 @@ def test_ctrl_c_stops_the_race_and_still_releases_the_browser():
 
 
 def test_a_missing_key_is_one_readable_line_and_exit_2(monkeypatch, capsys):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(config, "load_env", lambda *a, **k: None)
     monkeypatch.setattr(config, "preflight_steel", lambda: pytest.fail("checked Steel before the key"))
     assert cli.main(["--start", "Cat", "--target", "Napoleon"]) == 2
     err = capsys.readouterr().err
-    assert "ANTHROPIC_API_KEY" in err and "Traceback" not in err
+    assert "LLM_API_KEY" in err and "Traceback" not in err
 
 
 def test_the_host_presses_enter_finish_is_gone():

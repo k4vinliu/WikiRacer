@@ -12,7 +12,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { sseFeed } from "./sseFeed";
+import { AGENT_BASE, sseFeed } from "./sseFeed";
 import type { AgentEvent } from "./types";
 
 class FakeEventSource {
@@ -53,6 +53,13 @@ function subscribed() {
   const es = FakeEventSource.last!;
   return { got, unsub, es, errors: () => got.filter((e) => e.t === "error") };
 }
+
+describe("AGENT_BASE", () => {
+  it("falls back to /agent when VITE_AGENT_BASE is unset", () => {
+    expect(AGENT_BASE).toBe(import.meta.env.VITE_AGENT_BASE ?? "/agent");
+    expect(AGENT_BASE.endsWith("/")).toBe(false);
+  });
+});
 
 describe("sseFeed disconnect notices", () => {
   it("stays silent for a blip before the stream ever opened", () => {

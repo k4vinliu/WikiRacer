@@ -62,7 +62,7 @@ Stdlib `ThreadingHTTPServer` on `127.0.0.1:8848`. Zero new dependencies.
 - `POST /race/{id}/go` — the gun (both clocks start)
 - `GET /events` — SSE, **replay the full log on connect** (load-bearing; without it arming hangs)
 - `POST /stop` — kill run + Steel session
-- `GET /health` — `{ok, anthropic_key, steel}`
+- `GET /health` — `{ok, llm_key, steel}`
 
 Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Access-Control-Allow-Origin: *`.
 
@@ -71,7 +71,7 @@ Emit `FRONTEND.md` §6.1 events via an `emit` callback. `anchor_text` is require
 ## `config.py`
 
 - Load `.env` (`python-dotenv`).
-- Require `ANTHROPIC_API_KEY`; construct `anthropic.Anthropic(timeout=8.0, max_retries=1)`.
+- Require `LLM_API_KEY` (falls back to `ANTHROPIC_API_KEY`); construct `anthropic.Anthropic(api_key=..., base_url=..., timeout=8.0, max_retries=1)`.
 - **Do not hard-check `STEEL_API_KEY`.** Run `steel doctor --preflight`.
 - Defaults: `claude-haiku-4-5`, `max_hops=25`, `session_timeout_ms=900_000`.
 

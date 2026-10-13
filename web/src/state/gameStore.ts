@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { makeFeed, type FeedHandle } from "../agent";
+import { AGENT_BASE, makeFeed, type FeedHandle } from "../agent";
 import type {
   AgentEvent,
   Difficulty,
@@ -513,7 +513,7 @@ export function dismissAbandoned(): void {
   resetRunFlags();
   setLive(false);
   try {
-    void fetch("http://127.0.0.1:8848/stop", { method: "POST" }).catch(() => undefined);
+    void fetch(`${AGENT_BASE}/stop`, { method: "POST" }).catch(() => undefined);
   } catch {
     /* server may not be up */
   }

@@ -1,6 +1,6 @@
 import type { AgentEvent, AgentFeed, Difficulty } from "./types";
 
-export const AGENT_BASE = "http://127.0.0.1:8848";
+export const AGENT_BASE = import.meta.env.VITE_AGENT_BASE ?? "/agent";
 
 export type FeedHandle = AgentFeed & {
   arm: (args: {

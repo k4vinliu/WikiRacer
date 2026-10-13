@@ -32,14 +32,14 @@ npm run dev                       # from the repo root → http://127.0.0.1:5173
 | Python **3.10+** | `python3.11 --version`. macOS's system `python3` may be 3.9, which can't import this code (`X \| None` annotations). Any 3.10+ interpreter works. |
 | Node 18+ | `node --version` |
 | Steel CLI, logged in | `curl -fsS https://setup.steel.dev \| sh` (the **native** installer, not `npm i -g @steel-dev/cli`, which is now just a slower shim), then `steel login`, then `steel doctor --preflight` |
-| An Anthropic API key | goes in `.env` (below). **Not** a Steel key: `steel login` handles Steel. |
+| An LLM API key | goes in `.env` as `LLM_API_KEY` (below). Anthropic by default; any Anthropic-compatible provider works by changing `LLM_BASE_URL` and the model IDs. **Not** a Steel key: `steel login` handles Steel locally. |
 
 **Once**
 
 ```bash
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env               # then paste your key after ANTHROPIC_API_KEY=
+cp .env.example .env               # then paste your key after LLM_API_KEY=
 npm --prefix web install
 ```
 
@@ -56,7 +56,7 @@ npm --prefix web run dev
 
 Open **http://localhost:5173/?agent=real**. Without `?agent=real` the app uses the mock agent.
 
-The server prints one line per agent event, and checks your Anthropic key and Steel login at
+The server prints one line per agent event, and checks your LLM key and Steel login at
 startup. If either is wrong it still starts, and a race shows the reason on screen instead of
 hanging.
 
@@ -78,7 +78,23 @@ hanging.
 The wait comes at the start of every hop, before the agent looks for its next link. Once it has
 chosen, it clicks straight away, so it never sits on a link it has already found, the target
 included. `FRONTEND.md` §5.5 first ruled out any per-hop delay; the team added one on
-2026-09-13 after finding that no human could win on any tier.
+2026-09-13 after finding that no human could win on any tier. Override the model IDs with
+`LLM_EASY_MODEL` / `LLM_MEDIUM_MODEL` / `LLM_HARD_MODEL`.
+
+## Docker
+
+Copy `.env.example` to `.env` and fill in the keys. Secrets stay in `.env`; they are passed
+into the agent container and are **not** baked into either image.
+
+```bash
+cp .env.example .env    # LLM_API_KEY, LLM_BASE_URL, models, STEEL_API_KEY
+docker compose up --build
+```
+
+Open **http://localhost/?agent=real**. The web container serves the Vite build and proxies
+`/agent/*` to the Python server. Only port 80 is published.
+
+`npm run test` / `python -m pytest` stay the offline path; they do not need Docker or keys.
 
 ## The headless agent (Lane C's regression harness)
 
@@ -123,7 +139,7 @@ python -m speedrun.steel_client     # live Steel smoke test: spends one short se
 |---|---|
 | The agent panel says *Agent disconnected* | The server isn't running, or it was restarted mid-race. Start `python -m speedrun.server`. |
 | Arming times out (20 s) | Steel is slow or down. Check `steel doctor --preflight`, or restart the server with `--page-source http`. |
-| *Anthropic rejected the API key* / *ANTHROPIC_API_KEY is not set* | Fix `.env`, then restart the server. |
+| *The LLM provider rejected the API key* / *LLM_API_KEY is not set* | Fix `.env`, then restart the server. `ANTHROPIC_API_KEY` is still accepted if `LLM_API_KEY` is empty. |
 | *speedrun/picker.py isn't in this checkout* | Lane B's picker isn't merged into your branch yet. Pull it, or use `--picker first` to test the rest. |
 | The agent seems to hang | `steel browser sessions`, then `steel browser stop --all`. The server also stops leftover `wikiracer-srv-*` sessions every time it starts. |
 | A session died mid-race | Almost certainly its `--session-timeout`, which is create-time only and defaults to 5 minutes. We always pass 15 minutes. |
@@ -134,8 +150,9 @@ python -m speedrun.steel_client     # live Steel smoke test: spends one short se
 ## The agent server protocol
 
 This is for anyone touching `web/src/agent/sseFeed.ts`. The server is standard library only
-and listens on `127.0.0.1` only. Only pages served from this machine may drive it, because a
-race spends Steel and Anthropic credit.
+and listens on `127.0.0.1` by default (`--host 0.0.0.0` in Docker). Locally, only pages served
+from this machine may drive it, because a race spends Steel and LLM credit. Behind Docker
+nginx the frontend calls `/agent` on the same origin.
 
 | Request | Answer |
 |---|---|
@@ -143,7 +160,7 @@ race spends Steel and Anthropic credit.
 | `GET /events?race=<id>` (`<id>` may be `current`) | Server-Sent Events. Replays the race's whole log, then streams it live. Plain `message` frames with `id:` = `seq`; `Last-Event-ID` resumes. |
 | `POST /race/<id>/go` | The gun: the server's clock starts when this arrives. `409` until `ready`. |
 | `POST /stop` | Stops the current race and releases its browser. Idempotent. |
-| `GET /health` | `{ok, anthropic_key, steel, detail, race, …}` |
+| `GET /health` | `{ok, llm_key, steel, detail, race, …}` |
 
 Events are the §6.1 schema: `web/src/agent/types.ts` on one side, `speedrun/events.py` on the
 other, and `tests/test_events.py` fails the build if they drift apart. `at` is milliseconds

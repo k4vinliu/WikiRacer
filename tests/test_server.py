@@ -42,7 +42,7 @@ class Harness:
         manager_kw.setdefault("drop_grace_s", 5.0)
         self.manager = server.RaceManager(self.factory, tiers=config.tiers(env={}), **manager_kw)
         self.httpd = server.make_server(self.manager, host="127.0.0.1", port=0,
-                                        health=lambda: {"anthropic_key": True, "steel": True})
+                                        health=lambda: {"llm_key": True, "steel": True})
         self.port = self.httpd.server_address[1]
         threading.Thread(target=self.httpd.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True).start()
 
@@ -149,7 +149,7 @@ def state_of(h: Harness, rid: str) -> str | None:
 def test_health_reports_the_prerequisites(h):
     status, _, data = h.request("GET", "/health")
     assert status == 200
-    assert (data["ok"], data["anthropic_key"], data["steel"], data["race"]) == (True, True, True, None)
+    assert (data["ok"], data["llm_key"], data["steel"], data["race"]) == (True, True, True, None)
 
 
 def test_a_full_race_over_http(h):
@@ -300,13 +300,13 @@ def test_a_race_nobody_subscribes_to_is_stopped():
 
 
 def test_a_setup_problem_reaches_the_page_as_a_fatal_error():
-    # e.g. no ANTHROPIC_API_KEY: say so on screen instead of hanging in arming for 20 s.
-    h = Harness(factory_error=config.ConfigError("ANTHROPIC_API_KEY is not set."))
+    # e.g. no LLM_API_KEY: say so on screen instead of hanging in arming for 20 s.
+    h = Harness(factory_error=config.ConfigError("LLM_API_KEY is not set."))
     try:
         rid = start_race(h)
         events = SSE(h.port, rid).until("done")
         assert events[-2]["t"] == "error" and events[-2]["fatal"] is True
-        assert events[-1]["reason"] == "error" and "ANTHROPIC_API_KEY" in events[-1]["message"]
+        assert events[-1]["reason"] == "error" and "LLM_API_KEY" in events[-1]["message"]
     finally:
         h.close()
 
@@ -330,6 +330,12 @@ def test_a_page_on_another_origin_cannot_start_a_race(h):
                              headers={"Origin": "https://evil.example"})
     assert status == 403
     assert h.params_seen == []
+
+
+def test_star_allow_origin_accepts_any_page():
+    # Docker: the agent is not published, nginx proxies /agent, so * is safe.
+    assert server.origin_allowed("https://evil.example", extra=["*"]) is True
+    assert server.origin_allowed("https://evil.example", extra=[]) is False
 
 
 def test_bad_bodies_are_400(h):

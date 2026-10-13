@@ -54,6 +54,30 @@ def test_hard_runs_sonnet_unless_the_team_overrides_it():
     assert config.tiers(env={"WIKIRACER_HARD_MODEL": "claude-haiku-4-5"})["hard"].model == "claude-haiku-4-5"
 
 
+def test_llm_model_env_vars_override_each_tier():
+    env = {
+        "LLM_EASY_MODEL": "easy-model",
+        "LLM_MEDIUM_MODEL": "medium-model",
+        "LLM_HARD_MODEL": "hard-model",
+    }
+    tiers = config.tiers(env=env)
+    assert (tiers["easy"].model, tiers["medium"].model, tiers["hard"].model) == (
+        "easy-model", "medium-model", "hard-model",
+    )
+
+
+def test_llm_hard_model_wins_over_the_legacy_hard_model_env():
+    env = {"LLM_HARD_MODEL": "from-llm", "WIKIRACER_HARD_MODEL": "from-legacy"}
+    assert config.tiers(env=env)["hard"].model == "from-llm"
+
+
+def test_blank_llm_model_env_vars_keep_the_claude_defaults():
+    env = {"LLM_EASY_MODEL": " ", "LLM_MEDIUM_MODEL": "", "LLM_HARD_MODEL": ""}
+    tiers = config.tiers(env=env)
+    assert tiers["easy"].model == tiers["medium"].model == "claude-haiku-4-5"
+    assert tiers["hard"].model == "claude-sonnet-5"
+
+
 def test_every_tier_makes_the_agent_wait_before_each_click():
     # Added 2026-09-13 at the team's request, overriding FRONTEND.md §5.5's "no per-hop delay":
     # without a pause, no human could win on any tier.
@@ -70,19 +94,67 @@ def test_one_override_sets_every_tiers_wait():
 
 
 def test_make_client_without_a_key_says_where_to_put_it(monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(config, "load_env", lambda *a, **k: None)
-    with pytest.raises(config.ConfigError, match=r"\.env"):
+    with pytest.raises(config.ConfigError, match=r"LLM_API_KEY"):
         config.make_client()
 
 
 def test_make_client_uses_an_8s_timeout_and_one_retry(monkeypatch):
     # The SDK defaults are 10 minutes and 2 retries, and timeouts are retried: ~30 minutes of
     # dead air on stage before the picker's fallback could fire (PLAN.md §4.C).
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-a-real-one")  # nothing key-shaped for scanners
+    monkeypatch.setenv("LLM_API_KEY", "test-key-not-a-real-one")  # nothing key-shaped for scanners
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_BASE_URL", raising=False)
     monkeypatch.setattr(config, "load_env", lambda *a, **k: None)
     client = config.make_client()
     assert (client.timeout, client.max_retries) == (8.0, 1)
+    assert "api.anthropic.com" in str(client.base_url)
+
+
+def test_make_client_falls_back_to_anthropic_api_key(monkeypatch):
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "legacy-key-not-a-real-one")
+    monkeypatch.setattr(config, "load_env", lambda *a, **k: None)
+    captured: dict = {}
+
+    class Capturing:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.timeout = kwargs.get("timeout")
+            self.max_retries = kwargs.get("max_retries")
+
+    monkeypatch.setattr(anthropic, "Anthropic", Capturing)
+    config.make_client()
+    assert captured["api_key"] == "legacy-key-not-a-real-one"
+
+
+def test_llm_api_key_wins_over_anthropic_api_key_and_passes_base_url(monkeypatch):
+    monkeypatch.setenv("LLM_API_KEY", "llm-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "legacy-key")
+    monkeypatch.setenv("LLM_BASE_URL", "https://example.invalid/anthropic")
+    monkeypatch.setattr(config, "load_env", lambda *a, **k: None)
+    captured: dict = {}
+
+    class Capturing:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.timeout = kwargs.get("timeout")
+            self.max_retries = kwargs.get("max_retries")
+
+    monkeypatch.setattr(anthropic, "Anthropic", Capturing)
+    config.make_client()
+    assert captured["api_key"] == "llm-key"
+    assert captured["base_url"] == "https://example.invalid/anthropic"
+    assert (captured["timeout"], captured["max_retries"]) == (8.0, 1)
+
+
+def test_llm_settings_prefer_llm_api_key():
+    env = {"LLM_API_KEY": " llm-key ", "ANTHROPIC_API_KEY": "legacy", "LLM_BASE_URL": ""}
+    settings = config.llm_settings(env)
+    assert settings.api_key == "llm-key"
+    assert settings.base_url == "https://api.anthropic.com"
 
 
 def test_preflight_checks_each_model_once():

@@ -24,3 +24,4 @@ export function makeFeed(pair: Pair): FeedHandle {
 }
 
 export { mockFeed, sseFeed };
+export { AGENT_BASE } from "./sseFeed";

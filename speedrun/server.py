@@ -15,12 +15,12 @@ web/src/agent/sseFeed.ts speaks:
                           `ready`, so a GO can never create a browser synchronously
                           (FRONTEND.md §8 trap 4).
     POST /stop            Stop the current race and release its browser. Idempotent.
-    GET  /health          {ok, anthropic_key, steel, ..., race}
+    GET  /health          {ok, llm_key, steel, ..., race}
 
 One race at a time: a new POST /race stops the previous one. If a race's event stream drops
 (a reload, a closed tab), the server stops that race itself after a short grace
 (FRONTEND.md §2.7), because a leaked Steel session is the one unacceptable outcome. Only
-pages served from this machine may drive it, because a race spends Steel and Anthropic credit.
+pages served from this machine may drive it, because a race spends Steel and LLM credit.
 
     python3.11 -m speedrun.server [--page-source steel|http] [--picker llm|first] [--max-hops N] [--hop-delay S]
 """
@@ -105,10 +105,14 @@ def parse_race_request(body: Any, tiers: Mapping[str, config.Tier],
 
 def origin_allowed(origin: str | None, extra: Iterable[str] = ()) -> bool:
     """Requests without an Origin (curl, the CLI) are fine. A browser page is allowed only if
-    it's served from this machine, or was named with --allow-origin."""
+    it's served from this machine, or was named with --allow-origin. `--allow-origin *`
+    (Docker, behind nginx) accepts any origin because the agent port is not public."""
     if not origin:
         return True
-    if origin in extra:
+    extras = list(extra)
+    if "*" in extras:
+        return True
+    if origin in extras:
         return True
     try:
         parts = urllib.parse.urlsplit(origin)
@@ -409,7 +413,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _health(self) -> None:
         info = dict(self.app.health())
-        self._json(200, {"ok": True, "anthropic_key": bool(info.pop("anthropic_key", False)),
+        self._json(200, {"ok": True, "llm_key": bool(info.pop("llm_key", False)),
                          "steel": bool(info.pop("steel", False)), **info,
                          "race": self.app.manager.describe_current()})
 
@@ -469,7 +473,7 @@ def build_factory(page_source: str, picker_kind: str, client: Any) -> Factory:
     def factory(params: RaceParams, log: ev.EventLog, stop: threading.Event, go: threading.Event):
         if picker_kind == "llm":
             if client is None:
-                raise config.ConfigError("The agent has no working Anthropic client: ANTHROPIC_API_KEY is "
+                raise config.ConfigError("The agent has no working LLM client: LLM_API_KEY is "
                                          "missing or was rejected. Fix .env and restart the server.")
             picker = race.llm_picker()
         else:
@@ -511,7 +515,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                     help="first = DEV ONLY: always the first unvisited link, no API key needed")
     ap.add_argument("--allow-origin", action="append", default=[], metavar="ORIGIN",
                     help="another page origin allowed to drive the agent")
-    ap.add_argument("--no-preflight", action="store_true", help="skip the Anthropic and Steel checks")
+    ap.add_argument("--no-preflight", action="store_true", help="skip the LLM and Steel checks")
     ap.add_argument("--max-hops", type=_hop_limit, default=config.DEFAULT_MAX_HOPS,
                     help=f"the agent's hop limit (default {config.DEFAULT_MAX_HOPS}); the app never sends one")
     ap.add_argument("--hop-delay", type=float, default=None, metavar="SECONDS",
@@ -537,11 +541,11 @@ def main(argv: list[str] | None = None) -> int:
             client = config.make_client()
             if not args.no_preflight:
                 config.preflight_anthropic(client, {t.model for t in tiers.values()})
-            health["anthropic_key"] = True
+            health["llm_key"] = True
         except config.ConfigError as e:
             client = None
-            health["anthropic_key"] = False
-            health["detail"]["anthropic"] = str(e)
+            health["llm_key"] = False
+            health["detail"]["llm"] = str(e)
             _note(f"WARNING: {e}")
     if args.page_source == "steel":
         ok, detail = (True, "not checked (--no-preflight)") if args.no_preflight else config.preflight_steel()
@@ -564,7 +568,7 @@ def main(argv: list[str] | None = None) -> int:
     httpd = make_server(manager, args.host, args.port, health=lambda: health,
                         allowed_origins=args.allow_origin, verbose=args.verbose)
     if args.host not in ("127.0.0.1", "localhost", "::1"):
-        _note(f"WARNING: listening on {args.host}: anyone who can reach it can spend your Steel and Anthropic credit")
+        _note(f"WARNING: listening on {args.host}: anyone who can reach it can spend your Steel and LLM credit")
 
     def _terminate(signum, frame):
         raise KeyboardInterrupt

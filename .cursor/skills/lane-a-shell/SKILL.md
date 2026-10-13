@@ -112,7 +112,7 @@ export function playerNavigated(move: { title: string; anchorText: string }): vo
 export function mockFeed(pair: Pair, speed = 1): AgentFeed;
 export function makeFeed(pair: Pair): AgentFeed {
   return new URLSearchParams(location.search).get("agent") === "real"
-    ? sseFeed("http://127.0.0.1:8848") : mockFeed(pair);
+    ? sseFeed(import.meta.env.VITE_AGENT_BASE ?? "/agent") : mockFeed(pair);
 }
 ```
 

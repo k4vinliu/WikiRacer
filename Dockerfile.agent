@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/root/.steel/bin:${PATH}"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Native Steel CLI (not the npm shim). --non-interactive skips `steel init`.
+RUN curl -fsS https://setup.steel.dev | sh -s -- --non-interactive \
+    && test -x /root/.steel/bin/steel
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY speedrun ./speedrun
+
+EXPOSE 8848
+CMD ["python", "-m", "speedrun.server", "--host", "0.0.0.0", "--port", "8848"]
